@@ -17,3 +17,5 @@ local.properties
 # not in build/, so it has to be named here or it gets committed by accident.
 hs_err_pid*.log
 replay_pid*.log
+# CLI build output captured to a file at the repo root during scripted runs.
+*-build.log
