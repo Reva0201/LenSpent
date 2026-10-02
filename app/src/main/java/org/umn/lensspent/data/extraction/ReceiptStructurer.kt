@@ -30,6 +30,8 @@ internal class ReceiptStructurer(
         recognized: RecognizedText,
         onStep: (ExtractionStep) -> Unit = {}
     ): ExpenseDraft {
+        // The raw text is written down before anything interprets it: if the fast path below ever
+        // fails, what the recognizer read is still on the capture.
         repository.saveExtraction(
             captureId = capture.id,
             status = CaptureStatus.OCR_DONE,
@@ -43,6 +45,17 @@ internal class ReceiptStructurer(
                 ExtractionStage.FAST_PATH,
                 "read merchant='${draft.merchant}' amount=${draft.amountRupiah}"
             )
+        )
+
+        // The fast path's answer is the capture's structured output, which is what moves it from "text
+        // only" to "interpreted". ocrText is passed again because this write covers all four columns:
+        // omitting it would blank the text persisted a moment ago.
+        repository.saveExtraction(
+            captureId = capture.id,
+            status = CaptureStatus.STRUCTURED,
+            ocrText = recognized.text,
+            structuredJson = StructuredJson.of(draft),
+            modelVersion = ocrModelVersion
         )
         return draft
     }

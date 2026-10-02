@@ -157,9 +157,16 @@ fun CameraScreen(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { pickedUri ->
         if (pickedUri != null) {
-            latestThumbnailUri = pickedUri
-            // The pick is a capture like any other: store it before any extraction runs on it
-            viewModel.onImageCaptured(pickedUri.toString(), CaptureSource.PICKER)
+            // The pick is a capture like any other, but the picker's read grant does not outlive this
+            // process: the image is copied into the app's own gallery folder first, and the capture is
+            // recorded against the copy so the review sheet can still open it after a restart.
+            scope.launch {
+                val imported = ImageStorage.importToGallery(context, pickedUri)
+                if (imported != null) {
+                    latestThumbnailUri = imported
+                    viewModel.onImageCaptured(imported.toString(), CaptureSource.PICKER)
+                }
+            }
         }
     }
     

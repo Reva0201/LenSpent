@@ -44,8 +44,8 @@ interface TransactionRepository {
     /**
      * Records an image the moment it is taken or picked, before any extraction has run on it.
      *
-     * Returns the id of the existing row when the same image is captured twice (picking the same
-     * screenshot again), so callers always get a usable id rather than a silent no-op.
+     * Returns the id of the existing row when the same image URI is recorded twice, so callers always
+     * get a usable id rather than a silent no-op.
      */
     suspend fun recordCapture(
         sourceUri: String,
@@ -65,7 +65,12 @@ interface TransactionRepository {
         modelVersion: String? = null
     )
 
-    /** Seeds the category taxonomy, and demo rows only while the ledger is completely empty. */
+    /**
+     * Seeds the category taxonomy.
+     *
+     * The ledger itself is never seeded: an empty dashboard is the honest state for a new install, and
+     * both the dashboard and the charts have an empty state for it.
+     */
     suspend fun seedIfEmpty()
 
     companion object {

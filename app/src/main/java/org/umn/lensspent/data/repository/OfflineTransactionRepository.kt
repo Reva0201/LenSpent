@@ -1,7 +1,5 @@
 package org.umn.lensspent.data.repository
 
-import java.time.LocalDate
-import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -27,8 +25,7 @@ import org.umn.lensspent.data.model.Transaction
 class OfflineTransactionRepository(
     private val transactionDao: TransactionDao,
     private val categoryDao: CategoryDao,
-    private val captureDao: CaptureDao,
-    private val zone: ZoneId = ZoneId.systemDefault()
+    private val captureDao: CaptureDao
 ) : TransactionRepository {
 
     override fun observeCategories(): Flow<List<Category>> =
@@ -110,12 +107,10 @@ class OfflineTransactionRepository(
     )
 
     override suspend fun seedIfEmpty() {
+        // The taxonomy only. The ledger starts empty on purpose: a new install shows the user their own
+        // spending or an empty state, never rows they did not enter.
         if (categoryDao.count() == 0) {
             categoryDao.insertAll(DefaultCategories)
-        }
-        if (transactionDao.count() == 0) {
-            val categoryIds = categoryDao.all().associate { it.name to it.id }
-            transactionDao.insertAll(demoTransactions(categoryIds, LocalDate.now(zone)))
         }
     }
 
@@ -132,38 +127,7 @@ class OfflineTransactionRepository(
         }
     }
 
-    /**
-     * The three rows the dashboard used to hard-code, dated relative to today.
-     *
-     * Only inserted while the ledger is completely empty, so a fresh install shows a populated
-     * dashboard and the first real capture appends to it rather than replacing it.
-     */
-    private fun demoTransactions(
-        categoryIds: Map<String, Long>,
-        today: LocalDate
-    ): List<TransactionEntity> {
-        fun occurredAtDaysAgo(daysAgo: Long): Long =
-            today.minusDays(daysAgo).atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
-
-        return listOf(
-            Triple("Supermarket Central", 850_000L, "Groceries"),
-            Triple("Gas Station Premium", 600_000L, "Transport"),
-            Triple("Coffee Shop Artisanal", 125_000L, "Dining")
-        ).mapIndexedNotNull { index, (merchant, amount, categoryName) ->
-            val categoryId = categoryIds[categoryName] ?: return@mapIndexedNotNull null
-            TransactionEntity(
-                merchant = merchant,
-                amount = amount,
-                categoryId = categoryId,
-                occurredAt = occurredAtDaysAgo(index.toLong()),
-                note = DemoSeedNote
-            )
-        }
-    }
-
     private companion object {
-        const val DemoSeedNote = "Sample entry"
-
         /** Never expected on screen: expenses are only ever written against a real category row. */
         val UncategorisedCategory = Category(
             id = -1L,

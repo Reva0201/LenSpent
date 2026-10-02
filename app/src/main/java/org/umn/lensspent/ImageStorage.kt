@@ -81,6 +81,48 @@ object ImageStorage {
     }
 
     /**
+     * Copies an image the user picked into the app's own folder in the shared gallery, and returns the
+     * URI of the copy.
+     *
+     * The grant the photo picker hands back lasts only as long as this process does, and a capture row
+     * outlives it: without the copy, reopening an old pick after a restart would point at an image this
+     * app is no longer allowed to read, and the OCR stage would have nothing to open.
+     *
+     * Returns null when nothing could be copied, in which case there is no image worth recording.
+     */
+    suspend fun importToGallery(context: Context, source: Uri): Uri? {
+        val copy = withContext(Dispatchers.IO) {
+            try {
+                val target = context.contentResolver.insert(
+                    captureCollection(),
+                    createNativeImageContentValues()
+                ) ?: return@withContext null
+
+                val copied = context.contentResolver.openInputStream(source)?.use { input ->
+                    context.contentResolver.openOutputStream(target)?.use { output ->
+                        input.copyTo(output)
+                        true
+                    } ?: false
+                } ?: false
+
+                if (copied) {
+                    target
+                } else {
+                    // A row with no bytes behind it is worse than no row: it would show a blank frame in
+                    // the gallery forever, so the insert is rolled back.
+                    context.contentResolver.delete(target, null, null)
+                    null
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+        if (copy != null) publishImage(context, copy)
+        return copy
+    }
+
+    /**
      * Clears the pending flag of a finished capture so the rest of the device can see it.
      */
     suspend fun publishImage(context: Context, uri: Uri) = withContext(Dispatchers.IO) {

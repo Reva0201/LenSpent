@@ -88,10 +88,13 @@ fun SpendingBarChart(
         )
     }
 
-    // One spring per bar, read later from the draw phase and by the visible tooltip only
+    // One spring per bar, read later from the draw phase and by the visible tooltip only.
+    // A period with nothing in it has no peak to scale against - every bucket is zero - so the
+    // fraction is pinned to zero rather than dividing by it: 0f/0f would be NaN, which no spring can
+    // settle on and which would place the tooltip at an undefined offset.
     val barFractions = data.map { amount ->
         animateFloatAsState(
-            targetValue = amount / maxVal,
+            targetValue = if (maxVal > 0f) amount / maxVal else 0f,
             animationSpec = BarSpring,
             label = "BarFraction"
         )

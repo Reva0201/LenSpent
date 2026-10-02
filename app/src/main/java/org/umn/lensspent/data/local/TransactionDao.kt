@@ -30,14 +30,8 @@ interface TransactionDao {
     )
     fun observeSumBetween(from: Long, to: Long): Flow<Long>
 
-    @Query("SELECT COUNT(*) FROM transactions")
-    suspend fun count(): Int
-
     @Insert
     suspend fun insert(entity: TransactionEntity): Long
-
-    @Insert
-    suspend fun insertAll(entities: List<TransactionEntity>)
 
     /**
      * Updates only the user-editable columns on purpose: rewriting the whole row would reset

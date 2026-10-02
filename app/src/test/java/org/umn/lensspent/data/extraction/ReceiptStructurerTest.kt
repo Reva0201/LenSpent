@@ -46,9 +46,10 @@ class ReceiptStructurerTest {
 
         assertEquals("TOKO SUMBER JAYA", draft.merchant)
         assertEquals(25_000L, draft.amountRupiah)
-        assertEquals(1, repository.savedExtractions.size)
-        assertEquals(CaptureStatus.OCR_DONE, repository.savedExtractions.single().status)
-        assertEquals(MlKitCaptureExtractor.ModelVersion, repository.savedExtractions.single().modelVersion)
+        assertEquals(2, repository.savedExtractions.size)
+        assertEquals(CaptureStatus.OCR_DONE, repository.savedExtractions.first().status)
+        assertEquals(CaptureStatus.STRUCTURED, repository.savedExtractions.last().status)
+        assertEquals(MlKitCaptureExtractor.ModelVersion, repository.savedExtractions.last().modelVersion)
     }
 
     @Test
@@ -59,6 +60,24 @@ class ReceiptStructurerTest {
         assertEquals(CaptureStatus.OCR_DONE, first.status)
         assertEquals(fastPathReceipt.text, first.ocrText)
         assertEquals(capture.id, first.captureId)
+    }
+
+    /**
+     * The two writes are whole-row updates, so the second one has to carry the OCR text forward: a
+     * structured answer that blanks the raw text would make re-extracting an old capture impossible.
+     */
+    @Test
+    fun `the structured answer is stored without blanking the raw text`() {
+        structure(fastPathReceipt)
+
+        val structured = repository.savedExtractions.last()
+        assertEquals(CaptureStatus.STRUCTURED, structured.status)
+        assertEquals(
+            """{"merchant":"TOKO SUMBER JAYA","total_amount":25000}""",
+            structured.structuredJson
+        )
+        assertEquals(fastPathReceipt.text, structured.ocrText)
+        assertEquals(capture.id, structured.captureId)
     }
 
     @Test
