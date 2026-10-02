@@ -1,0 +1,437 @@
+package org.umn.lensspent
+
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.umn.lensspent.data.model.Category
+
+private val PreviewHeight = 200.dp
+
+/**
+ * The confirmation step, and the only place an expense ever enters the ledger.
+ *
+ * Whatever extraction produced is shown for the user to correct - nothing is written until they press
+ * save, which is what keeps a wrong OCR reading from becoming a wrong bank balance. Saving then shows
+ * what was written and waits: the sheet leaves for the dashboard only once that has been read.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ExpenseReviewScreen(
+    captureId: Long,
+    onFinished: () -> Unit,
+    viewModel: ExpenseReviewViewModel = viewModel(factory = AppViewModelProvider.Factory)
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val finished by viewModel.finished.collectAsStateWithLifecycle()
+    val extractionTrace by viewModel.extractionTrace.collectAsStateWithLifecycle()
+    val savedExpense by viewModel.savedExpense.collectAsStateWithLifecycle()
+
+    LaunchedEffect(captureId) { viewModel.start(captureId) }
+    LaunchedEffect(finished) {
+        if (finished) {
+            viewModel.consumeFinished()
+            onFinished()
+        }
+    }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text(text = "Confirm expense", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onFinished) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                // Edge-to-edge is enabled, so the app bar keeps its status bar inset
+                windowInsets = TopAppBarDefaults.windowInsets
+            )
+        }
+    ) { paddingValues ->
+        when (val state = uiState) {
+            null, is ExpenseReviewUiState.Processing -> ProcessingPane(
+                modifier = Modifier.padding(paddingValues),
+                trace = extractionTrace
+            )
+
+            is ExpenseReviewUiState.Unavailable -> UnavailablePane(
+                modifier = Modifier.padding(paddingValues),
+                onDismiss = onFinished
+            )
+
+            is ExpenseReviewUiState.Editing -> EditingPane(
+                state = state,
+                viewModel = viewModel,
+                modifier = Modifier.padding(paddingValues)
+            )
+        }
+    }
+
+    // Read, then gone. The confirmation replaces navigating away rather than following it: the
+    // dashboard only appears once this has been dismissed - by its button, by Back, or by a tap
+    // outside, all of which acknowledgeSaved() treats as the same answer.
+    savedExpense?.let { saved ->
+        SaveConfirmationDialog(saved = saved, onDismiss = viewModel::acknowledgeSaved)
+    }
+}
+
+/**
+ * What the sheet says once the expense is in the ledger, before the dashboard appears.
+ *
+ * A saved expense that instantly becomes a dashboard is indistinguishable from one that never saved,
+ * so the values the row was written from are read back to the user first: the merchant and the amount
+ * as stored, the category it was filed under, and the day it landed on in [dayLabel]'s wording - the
+ * same label the stepper above used, so the two cannot describe one date two different ways.
+ *
+ * `internal` rather than private so an instrumented test can render it on a real device and read it
+ * the way a user would, with the row already written and nothing left to do but acknowledge it.
+ */
+@Composable
+internal fun SaveConfirmationDialog(saved: SavedExpense, onDismiss: () -> Unit) {
+    AlertDialog(
+        // Back, or a tap outside, has read the confirmation just as surely as the button has
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = { Text(text = "Expense saved", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "${saved.merchant} - ${formatIDR(saved.amountRupiah)}",
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = saved.categoryName?.let { "Added to $it spending." }
+                        ?: "Saved without a category name."
+                )
+                Text(text = dayLabel(saved.date))
+                Text(
+                    text = "It's in your recent transactions now.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) { Text(text = "Done") }
+        }
+    )
+}
+
+/**
+ * First stage: the brief on-device work that happens before anything is editable.
+ *
+ * [trace] is the debug panel below it - the pipeline's own account of what it is doing - and it is
+ * deliberately part of this pane rather than of the sheet: it disappears the moment there is
+ * something to edit, so a receipt the fast path read leaves a single line and no model stage at all.
+ */
+@Composable
+private fun ProcessingPane(modifier: Modifier, trace: List<ExtractionTraceLine>) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 24.dp)
+        ) {
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Reading your receipt",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Runs on this device - nothing is uploaded.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (trace.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                ExtractionTracePanel(trace)
+            }
+        }
+    }
+}
+
+/**
+ * Debug: how the receipt is being read, one stage at a time, while the sheet is not yet editable.
+ *
+ * This is the answer to "did the on-device model actually run, and what did it cost me": a receipt
+ * the fast path read shows one line and never a model stage, while a fallback shows the load, the
+ * generation and the model's own answer, in the order they happened. Monospaced so the times and
+ * the stage names line up, and trimmed to the newest few lines so a slow first run cannot push the
+ * spinner off the screen.
+ */
+@Composable
+private fun ExtractionTracePanel(trace: List<ExtractionTraceLine>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                shape = MaterialTheme.shapes.small
+            )
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = "DEBUG - how this receipt is being read",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        trace.forEach { line ->
+            Text(
+                text = "${elapsedLabel(line.elapsedMillis)}  " +
+                    "${line.step.stage.label}: ${line.step.detail}",
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+    }
+}
+
+/** Shown when the capture behind a navigation argument no longer exists. */
+@Composable
+private fun UnavailablePane(modifier: Modifier, onDismiss: () -> Unit) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "This capture is no longer available.",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            TextButton(onClick = onDismiss) { Text(text = "Go back") }
+        }
+    }
+}
+
+/**
+ * The editable draft.
+ *
+ * Save stays disabled until there is a merchant, a positive amount and a category, so the ledger can
+ * only ever receive complete rows.
+ */
+@Composable
+private fun EditingPane(
+    state: ExpenseReviewUiState.Editing,
+    viewModel: ExpenseReviewViewModel,
+    modifier: Modifier
+) {
+    val context = LocalContext.current
+    var preview by remember { mutableStateOf<ImageBitmap?>(null) }
+    val previewTargetPx = with(LocalDensity.current) { (PreviewHeight * 2).roundToPx() }
+
+    LaunchedEffect(state.imageUri) {
+        preview = withContext(Dispatchers.IO) {
+            decodeSampledBitmap(context, Uri.parse(state.imageUri), previewTargetPx)
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .imePadding()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        CapturePreview(preview = preview)
+
+        OutlinedTextField(
+            value = state.merchant,
+            onValueChange = viewModel::onMerchantChange,
+            label = { Text(text = "Merchant") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = state.amountText,
+            onValueChange = viewModel::onAmountChange,
+            label = { Text(text = "Total (Rp)") },
+            singleLine = true,
+            isError = state.amountError,
+            supportingText = {
+                val amount = state.amountRupiah
+                Text(
+                    text = when {
+                        state.amountError -> "Enter the total printed on the receipt."
+                        amount != null && amount > 0L -> formatIDR(amount)
+                        else -> "Whole Rupiah, for example 1.250.000"
+                    }
+                )
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "Date",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            // The shared stepper, so this screen and analytics step dates identically
+            StepperHeader(
+                label = dayLabel(state.selectedDate),
+                // Same rule as analytics: an expense can be dated in the past, never in the future
+                nextEnabled = state.canStepForward,
+                onStep = { viewModel.onDayStep(it.toLong()) }
+            )
+        }
+
+        CategoryPicker(
+            categories = state.categories,
+            selectedCategoryId = state.selectedCategoryId,
+            onSelect = viewModel::onCategorySelected
+        )
+
+        Button(
+            onClick = viewModel::save,
+            enabled = state.canSave,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (state.isSaving) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text(text = "Save expense")
+            }
+        }
+
+        TextButton(
+            onClick = viewModel::discard,
+            enabled = !state.isSaving,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
+            Text(text = "Discard")
+        }
+    }
+}
+
+/** The captured image, decoded downsampled; a receipt icon stands in while it loads. */
+@Composable
+private fun CapturePreview(preview: ImageBitmap?) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(PreviewHeight)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (preview != null) {
+            Image(
+                bitmap = preview,
+                contentDescription = "Captured receipt",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/** Horizontally scrolling chips straight from the stored taxonomy, icons included. */
+@Composable
+private fun CategoryPicker(
+    categories: List<Category>,
+    selectedCategoryId: Long?,
+    onSelect: (Long) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Category",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(categories, key = { it.id }) { category ->
+                FilterChip(
+                    selected = category.id == selectedCategoryId,
+                    onClick = { onSelect(category.id) },
+                    label = { Text(text = category.name) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = categoryIcon(category.iconKey),
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                )
+            }
+        }
+    }
+}

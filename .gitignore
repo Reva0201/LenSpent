@@ -1,0 +1,19 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+# A JVM crash log, if the Gradle daemon or the IDE ever dies mid-build. It lands next to the module,
+# not in build/, so it has to be named here or it gets committed by accident.
+hs_err_pid*.log
+replay_pid*.log
