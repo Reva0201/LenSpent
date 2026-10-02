@@ -1,5 +1,9 @@
 package org.umn.lensspent.data.extraction
 
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -96,5 +100,60 @@ class ReceiptParserTest {
 
         assertEquals("TOKO ABC", draft.merchant)
         assertEquals(0L, draft.amountRupiah)
+    }
+
+    /**
+     * The zone is injected, not read from the device: a receipt printed in Jakarta has to land on the
+     * same ledger day no matter where the phone happens to be when it is scanned. "America/New_York"
+     * is deliberately not the test host's zone, so a stray ZoneId.systemDefault() fails here.
+     */
+    @Test
+    fun `resolves the receipt's own date in the injected zone`() {
+        val zone = ZoneId.of("America/New_York")
+        val clock = Clock.fixed(Instant.parse("2026-09-20T02:00:00Z"), zone)
+        val draft = ReceiptParser.parseLines(
+            lines = listOf(
+                "TOKO SUMBER JAYA",
+                "12/09/2026 14:32",
+                "Total          25.000"
+            ),
+            clock = clock
+        )
+
+        val expected = LocalDate.of(2026, 9, 12).atStartOfDay(zone).toInstant().toEpochMilli()
+        assertEquals(expected, draft.occurredAt)
+    }
+
+    /** With no usable date on the paper, "now" is the injected clock's now - not the wall clock. */
+    @Test
+    fun `falls back to the injected clock when the receipt carries no date`() {
+        val clock = Clock.fixed(
+            Instant.parse("2026-09-20T02:00:00Z"),
+            ZoneId.of("America/New_York")
+        )
+        val draft = ReceiptParser.parseLines(
+            lines = listOf("TOKO ABC", "Kopi Susu 25.000"),
+            clock = clock
+        )
+
+        assertEquals(clock.millis(), draft.occurredAt)
+    }
+
+    /**
+     * The one-year sanity window is anchored to the injected clock too, so a receipt dated in the
+     * clock's future is treated as OCR noise rather than as a purchase.
+     */
+    @Test
+    fun `ignores a receipt date that is newer than the injected clock's today`() {
+        val clock = Clock.fixed(
+            Instant.parse("2026-09-20T02:00:00Z"),
+            ZoneId.of("America/New_York")
+        )
+        val draft = ReceiptParser.parseLines(
+            lines = listOf("TOKO SUMBER JAYA", "30/09/2026", "Total  25.000"),
+            clock = clock
+        )
+
+        assertEquals(clock.millis(), draft.occurredAt)
     }
 }

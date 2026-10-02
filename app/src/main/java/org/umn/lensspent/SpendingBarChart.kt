@@ -265,7 +265,8 @@ private fun BarTooltip(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = formatIDR(amount),
+                // The bucket is a Float for the layout maths; the label is a whole amount of Rupiah.
+                text = formatIDR(amount.toLong()),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.inverseOnSurface,

@@ -55,11 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Calendar
-import java.util.Locale
 import org.umn.lensspent.data.SpendingAggregator
 
 // --- 1. Data ---
@@ -435,63 +431,4 @@ fun HomeScreen(
                 }
             }
     }
-}
-
-// --- 3. Currency Formatting ---
-
-private val IdrLocale = java.util.Locale.forLanguageTag("id-ID")
-
-/**
- * NumberFormat is stateful and not thread-safe, so every thread keeps its own instance instead of
- * building a new formatter on each call - charts re-render far more often than they change data.
- */
-private val IdrNumberFormat: ThreadLocal<java.text.NumberFormat> = ThreadLocal.withInitial {
-    java.text.NumberFormat.getNumberInstance(IdrLocale)
-}
-
-/**
- * Formats a whole-Rupiah amount, e.g. 1340000L -> "Rp 1.340.000".
- */
-fun formatIDR(amount: Long): String {
-    val formatter = IdrNumberFormat.get() ?: java.text.NumberFormat.getNumberInstance(IdrLocale)
-    return "Rp ${formatter.format(amount)}"
-}
-
-/**
- * Formats a chart bucket as Indonesian Rupiah, e.g. 1340.5f -> "Rp 1.340".
- *
- * The charts carry Float buckets, so the rounding happens once here at the edge instead of forcing
- * every caller to convert.
- */
-fun formatIDR(amount: Float): String = formatIDR(amount.toLong())
-
-/** "Sep 18, 2026" in the device's zone, the way transaction dates read in the lists. */
-fun formatTransactionDate(epochMillis: Long): String = Instant.ofEpochMilli(epochMillis)
-    .atZone(ZoneId.systemDefault())
-    .toLocalDate()
-    .format(TransactionDateFormatter)
-
-private val TransactionDateFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH)
-
-/**
- * Compact Rupiah shorthand for the chart axis labels, e.g. 1700000f -> "Rp 1,7Jt", 561000f -> "Rp 561K".
- *
- * Callers should memoize the result (see [SpendingBarChart]): String.format allocates a Formatter per
- * call, which is fine for a handful of axis labels but not for every frame.
- */
-fun formatCompactIDR(amount: Float): String {
-    val (divisor, suffix) = when {
-        amount >= 1_000_000f -> 1_000_000f to "Jt"
-        amount >= 1_000f -> 1_000f to "K"
-        else -> return "Rp ${amount.toInt()}"
-    }
-    val value = amount / divisor
-    val formatted = if (value % 1 == 0f) {
-        value.toInt().toString()
-    } else {
-        // The Indonesian locale renders the decimal separator as a comma (e.g. 1,7Jt)
-        String.format(IdrLocale, "%.1f", value)
-    }
-    return "Rp $formatted$suffix"
 }

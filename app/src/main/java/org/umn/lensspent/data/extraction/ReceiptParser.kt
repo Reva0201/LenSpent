@@ -2,8 +2,8 @@ package org.umn.lensspent.data.extraction
 
 import org.umn.lensspent.data.model.ExpenseDraft
 import org.umn.lensspent.data.parseRupiahAmount
+import java.time.Clock
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.format.DateTimeFormatterBuilder
 import java.util.Locale
 
@@ -32,23 +32,27 @@ object ReceiptParser {
     private val DateLine = Regex("""^\d{1,4}[/.\-]\d{1,2}[/.\-]\d{1,4}""")
     private val TimeLine = Regex("""^\d{1,2}:\d{2}(:\d{2})?""")
 
-    internal fun parseLines(lines: List<String>): ExpenseDraft {
+    /**
+     * [clock] supplies "today" for the one-year sanity window and the zone the receipt's own date is
+     * resolved in, so a test can freeze a receipt in time and get the same draft on every run.
+     */
+    internal fun parseLines(lines: List<String>, clock: Clock = Clock.systemDefaultZone()): ExpenseDraft {
         val ocrLines = lines.mapIndexed { index, text ->
             OcrLine(text = text, left = 0, top = index * 50, bottom = index * 50 + 40, right = 500)
         }
-        return parseOcrLines(ocrLines)
+        return parseOcrLines(ocrLines, clock)
     }
 
-    internal fun parseLines(recognized: RecognizedText): ExpenseDraft {
+    internal fun parseLines(recognized: RecognizedText, clock: Clock = Clock.systemDefaultZone()): ExpenseDraft {
         val ocrLines = recognized.ocrLines.ifEmpty {
             recognized.lines.mapIndexed { index, text ->
                 OcrLine(text = text, left = 0, top = index * 50, bottom = index * 50 + 40, right = 500)
             }
         }
-        return parseOcrLines(ocrLines)
+        return parseOcrLines(ocrLines, clock)
     }
 
-    private fun parseOcrLines(ocrLines: List<OcrLine>): ExpenseDraft {
+    private fun parseOcrLines(ocrLines: List<OcrLine>, clock: Clock): ExpenseDraft {
         val processedRows = processedRowsOf(ocrLines)
         if (processedRows.isEmpty()) {
             return ExpenseDraft()
@@ -99,7 +103,9 @@ object ReceiptParser {
 
         // 3. Date Sanity Check
         val rowTexts = processedRows.map { it.text }
-        val occurredAt = extractAndValidateDate(rowTexts) ?: System.currentTimeMillis()
+        // The receipt's own date when it has a usable one, otherwise "now" from the same clock that
+        // judged it, so a frozen clock freezes the whole draft.
+        val occurredAt = extractAndValidateDate(rowTexts, clock) ?: clock.millis()
 
         return ExpenseDraft(
             merchant = merchant,
@@ -157,12 +163,13 @@ object ReceiptParser {
         }.toList()
     }
 
-    private fun extractAndValidateDate(lines: List<String>): Long? {
+    private fun extractAndValidateDate(lines: List<String>, clock: Clock): Long? {
         val regex1 = Regex("""\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})\b""")
         val regex2 = Regex("""\b(\d{4})[/.\-](\d{1,2})[/.\-](\d{1,2})\b""")
         val regex3 = Regex("""\b(\d{1,2})[\s/.\-]([A-Za-z]{3})[\s/.\-](\d{2,4})\b""")
 
-        val now = LocalDate.now()
+        val now = LocalDate.now(clock)
+        val zone = clock.zone
         val oneYearAgo = now.minusYears(1)
 
         for (line in lines) {
@@ -174,7 +181,7 @@ object ReceiptParser {
                 try {
                     val date = LocalDate.of(year, month, day)
                     if (!date.isAfter(now) && !date.isBefore(oneYearAgo)) {
-                        return date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        return date.atStartOfDay(zone).toInstant().toEpochMilli()
                     }
                 } catch (e: Exception) {}
             }
@@ -186,7 +193,7 @@ object ReceiptParser {
                 try {
                     val date = LocalDate.of(year, month, day)
                     if (!date.isAfter(now) && !date.isBefore(oneYearAgo)) {
-                        return date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        return date.atStartOfDay(zone).toInstant().toEpochMilli()
                     }
                 } catch (e: Exception) {}
             }
@@ -225,7 +232,7 @@ object ReceiptParser {
                     if (month != null) {
                         val date = LocalDate.of(year, month, day)
                         if (!date.isAfter(now) && !date.isBefore(oneYearAgo)) {
-                            return date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                            return date.atStartOfDay(zone).toInstant().toEpochMilli()
                         }
                     }
                 } catch (e: Exception) {}

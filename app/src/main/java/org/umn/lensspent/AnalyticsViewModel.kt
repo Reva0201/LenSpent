@@ -21,12 +21,17 @@ import org.umn.lensspent.data.repository.TransactionRepository
  */
 data class AnalyticsUiState(
     val isLoading: Boolean = true,
-    val today: LocalDate = LocalDate.now(),
-    val selectedDate: LocalDate = LocalDate.now(),
+    /**
+     * The clock's today. Required, not defaulted to LocalDate.now(): [AnalyticsViewModel] already
+     * injects a Clock, and a default here would read the system clock a second time and could hand
+     * back a state whose week starts after the day it contains.
+     */
+    val today: LocalDate,
+    val selectedDate: LocalDate = today,
     val selectedDateTotal: Long = 0L,
-    val weekStart: LocalDate = LocalDate.now(),
+    val weekStart: LocalDate = SpendingAggregator.weekStart(today),
     val weekSeries: List<Float> = List(SpendingAggregator.DaysInWeek) { 0f },
-    val year: Int = LocalDate.now().year,
+    val year: Int = today.year,
     val yearSeries: List<Float> = List(SpendingAggregator.MonthsInYear) { 0f },
     val history: List<Transaction> = emptyList()
 ) {
@@ -75,7 +80,7 @@ class AnalyticsViewModel(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(SubscriptionStopTimeoutMillis),
-        initialValue = AnalyticsUiState()
+        initialValue = AnalyticsUiState(today = today, weekStart = todayWeekStart)
     )
 
     /** Steps the day stepper; never past today, since the future has no spending in it. */
