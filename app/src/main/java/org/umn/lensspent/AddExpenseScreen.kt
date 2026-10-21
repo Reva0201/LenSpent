@@ -70,7 +70,11 @@ import org.umn.lensspent.ui.theme.Spacing
 fun AddExpenseScreen(
     onBack: () -> Unit,
     onSaved: () -> Unit,
-    viewModel: AddExpenseViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    transactionId: Long? = null,
+    viewModel: AddExpenseViewModel = viewModel(
+        key = "add-expense-${transactionId ?: "new"}",
+        factory = AppViewModelProvider.addExpenseFactory(transactionId)
+    )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
@@ -85,7 +89,7 @@ fun AddExpenseScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "New expense",
+                        text = if (uiState.isEditing) "Edit expense" else "New expense",
                         style = MaterialTheme.typography.titleLarge
                     )
                 },
@@ -151,7 +155,7 @@ fun AddExpenseScreen(
                             )
                             Spacer(modifier = Modifier.size(Spacing.sm))
                             Text(
-                                text = "Save expense",
+                                text = if (uiState.isEditing) "Save changes" else "Save expense",
                                 style = MaterialTheme.typography.labelLarge
                             )
                         }

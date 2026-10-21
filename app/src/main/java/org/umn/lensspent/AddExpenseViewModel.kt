@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.umn.lensspent.data.model.Category
+import org.umn.lensspent.data.model.Transaction
 import org.umn.lensspent.data.parseRupiahAmount
 import org.umn.lensspent.data.repository.TransactionRepository
 
@@ -43,7 +44,13 @@ data class AddExpenseUiState(
     val categoryTouched: Boolean = false,
     /** Set by a Save press, which is what reveals every error at once. */
     val saveAttempted: Boolean = false,
-    val isSaving: Boolean = false
+    val isSaving: Boolean = false,
+    /**
+     * Whether this form is correcting an existing row rather than creating one. It changes the title,
+     * the button and which repository call is made; nothing else about the form differs, which is the
+     * point - a correction should be the same job as an entry.
+     */
+    val isEditing: Boolean = false
 ) {
 
     /** Parsed from what is typed, every time, so the field and the truth cannot drift apart. */
@@ -84,18 +91,25 @@ data class AddExpenseUiState(
 /**
  * Owns the manual-entry form: the categories it offers, the draft being typed, and the one write.
  *
- * This is the app's only path to a transaction that did not come from a photo, so it is also the only
- * place where every field starts empty and every rule in [AddExpenseUiState] is reachable by hand.
+ * The same class backs creation and correction. [transactionId] decides which: null means a new row is
+ * inserted, a non-null id means that row is loaded into the form and updated in place. Sharing the form
+ * is deliberate - an edited expense has exactly the same fields and rules as a new one, and two copies
+ * of that logic would drift apart the first time a rule changed.
  */
 class AddExpenseViewModel(
     private val repository: TransactionRepository,
-    private val clock: Clock = Clock.systemDefaultZone()
+    private val clock: Clock = Clock.systemDefaultZone(),
+    private val transactionId: Long? = null
 ) : ViewModel() {
 
     private val today: LocalDate = LocalDate.now(clock)
 
     private val _uiState = MutableStateFlow(
-        AddExpenseUiState(selectedDate = today, today = today)
+        AddExpenseUiState(
+            selectedDate = today,
+            today = today,
+            isEditing = transactionId != null
+        )
     )
     val uiState: StateFlow<AddExpenseUiState> = _uiState.asStateFlow()
 
@@ -104,12 +118,31 @@ class AddExpenseViewModel(
     /** True once the row is written; the screen navigates away on it. */
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
 
+    /** The row being edited, once it has been loaded. Null while creating, or before the load lands. */
+    private var editing: Transaction? = null
+
     init {
         viewModelScope.launch {
             val categories = repository.observeCategories().first()
-            // No category is pre-selected: choosing one is a requirement of the form, and a default
-            // would mean the user could submit a row they never filed anywhere.
             _uiState.update { it.copy(categories = categories) }
+
+            val id = transactionId ?: return@launch
+            val existing = repository.observeTransaction(id).first() ?: return@launch
+            editing = existing
+            _uiState.update { state ->
+                state.copy(
+                    amountText = existing.amount.toString(),
+                    merchant = existing.merchant,
+                    note = existing.note.orEmpty(),
+                    selectedCategoryId = existing.category.id,
+                    selectedDate = localDateOf(existing.occurredAt, clock.zone),
+                    // A row that already exists is already valid, so the form opens without a wall of
+                    // "required" errors on fields the user did not touch.
+                    amountTouched = true,
+                    merchantTouched = true,
+                    categoryTouched = true
+                )
+            }
         }
     }
 
@@ -138,7 +171,8 @@ class AddExpenseViewModel(
      * Writes the expense, or reveals every outstanding error.
      *
      * The guard is [AddExpenseUiState.canSave] rather than a second copy of the rules, so a form the
-     * button says is ready is exactly a form this function will write.
+     * button says is ready is exactly a form this function will write. Whether that write inserts or
+     * updates is decided by [editing], which is set when the form was opened for an existing row.
      */
     fun save() {
         val state = _uiState.value
@@ -157,24 +191,42 @@ class AddExpenseViewModel(
         val merchant = state.merchant.trim()
         val amount = state.amountRupiah ?: return
         val categoryId = state.selectedCategoryId ?: return
+        val category = state.categories.firstOrNull { it.id == categoryId } ?: return
         val note = state.note.trim().takeIf { it.isNotEmpty() }
+        // Noon on the chosen day: the row has a date the user picked and no meaningful time, and noon
+        // is the one time that cannot slide across a DST boundary.
+        val occurredAt = state.selectedDate
+            .atTime(LocalTime.NOON)
+            .atZone(clock.zone)
+            .toInstant()
+            .toEpochMilli()
 
+        val existing = editing
         _uiState.update { it.copy(isSaving = true) }
         viewModelScope.launch {
             try {
-                repository.addTransaction(
-                    merchant = merchant,
-                    amount = amount,
-                    categoryId = categoryId,
-                    // Noon on the chosen day: the row has a date the user picked and no meaningful
-                    // time, and noon is the one time that cannot slide across a DST boundary.
-                    occurredAt = state.selectedDate
-                        .atTime(LocalTime.NOON)
-                        .atZone(clock.zone)
-                        .toInstant()
-                        .toEpochMilli(),
-                    note = note
-                )
+                if (existing != null) {
+                    // Exactly the fields the form owns. Everything else on the row - its id, when it
+                    // was recorded, the capture it came from - is left as it is, so a correction
+                    // cannot quietly re-date the audit trail.
+                    repository.updateTransaction(
+                        existing.copy(
+                            merchant = merchant,
+                            amount = amount,
+                            category = category,
+                            occurredAt = occurredAt,
+                            note = note
+                        )
+                    )
+                } else {
+                    repository.addTransaction(
+                        merchant = merchant,
+                        amount = amount,
+                        categoryId = categoryId,
+                        occurredAt = occurredAt,
+                        note = note
+                    )
+                }
                 _saved.value = true
             } catch (e: Exception) {
                 // Keep every field as the user left it so the save can simply be retried.

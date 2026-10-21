@@ -45,6 +45,22 @@ object AppViewModelProvider {
     }
 
     /**
+     * A factory for the manual-entry form, which either creates a row or corrects one.
+     *
+     * [transactionId] is null for a new expense and the row's id when the user came from the detail
+     * screen. Keyed by the caller so two forms in the back stack (one new, one editing) never share a
+     * ViewModel and leak each other's draft.
+     */
+    fun addExpenseFactory(transactionId: Long? = null): ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            AddExpenseViewModel(
+                repository = application().container.transactionRepository,
+                transactionId = transactionId
+            )
+        }
+    }
+
+    /**
      * A factory for the detail screen, which needs the row it was opened for.
      *
      * Built per id rather than added to [Factory] because the id is an argument, not a dependency: the

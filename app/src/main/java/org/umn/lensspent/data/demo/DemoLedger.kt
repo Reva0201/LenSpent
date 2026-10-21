@@ -3,6 +3,8 @@ package org.umn.lensspent.data.demo
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.flow.first
+import org.umn.lensspent.data.model.CaptureSource
+import org.umn.lensspent.data.model.CaptureStatus
 import org.umn.lensspent.data.repository.TransactionRepository
 
 /**
@@ -22,7 +24,15 @@ data class DemoExpense(
     val amountRupiah: Long,
     val categoryName: String,
     val daysAgo: Int,
-    val note: String? = null
+    val note: String? = null,
+    /**
+     * Whether this row was "scanned" rather than typed.
+     *
+     * The seeder writes a real capture row for these and links the transaction to it, so the detail
+     * screen's "From a receipt photo" is backed by something in the database instead of by a flag on
+     * the demo data. It also means the seeded ledger exercises both paths the app actually has.
+     */
+    val fromReceipt: Boolean = false
 )
 
 /**
@@ -39,22 +49,22 @@ data class DemoExpense(
  */
 val DemoLedger: List<DemoExpense> = listOf(
     DemoExpense("Kopi Kenangan Gading Serpong", 28_000, "Dining", 0, "Iced coffee before class"),
-    DemoExpense("Indomaret Kelapa Dua", 87_500, "Groceries", 0, "Weekly snacks and water"),
+    DemoExpense("Indomaret Kelapa Dua", 87_500, "Groceries", 0, "Weekly snacks and water", fromReceipt = true),
     DemoExpense("Gojek to Campus", 32_000, "Transport", 1),
-    DemoExpense("Uniqlo Summarecon Mall", 449_000, "Shopping", 2, "Jacket, end-of-season sale"),
+    DemoExpense("Uniqlo Summarecon Mall", 449_000, "Shopping", 2, "Jacket, end-of-season sale", fromReceipt = true),
     DemoExpense("Token Listrik PLN", 200_000, "Bills", 3, "Kos meter top-up"),
-    DemoExpense("Apotek K-24", 65_500, "Health", 4),
+    DemoExpense("Apotek K-24", 65_500, "Health", 4, fromReceipt = true),
     DemoExpense("Bioskop XXI CGV", 75_000, "Entertainment", 5, "Two tickets, student price"),
     DemoExpense("Buku Algoritma & Struktur Data", 189_000, "Education", 7),
     DemoExpense("GrabFood Nasi Padang", 54_000, "Dining", 8),
     DemoExpense("Warteg Bahari", 25_000, "Dining", 9, "Lunch with the group"),
-    DemoExpense("Alfamart Serpong", 43_200, "Groceries", 11),
+    DemoExpense("Alfamart Serpong", 43_200, "Groceries", 11, fromReceipt = true),
     DemoExpense("Pulsa Telkomsel 50GB", 150_000, "Bills", 13),
     DemoExpense("Steam - co-op game", 129_000, "Entertainment", 15),
     DemoExpense("Indomaret", 35_000, "Groceries", 18),
     DemoExpense("Klinik Gigi Serpong", 350_000, "Health", 21, "Scaling, annual visit"),
     DemoExpense("Shopee - USB-C cable", 89_000, "Shopping", 24),
-    DemoExpense("Pertamina Pertalite", 100_000, "Transport", 26),
+    DemoExpense("Pertamina Pertalite", 100_000, "Transport", 26, fromReceipt = true),
     DemoExpense("Laundry Kiloan", 30_000, "Other", 28)
 )
 
@@ -85,17 +95,32 @@ class DemoLedgerSeeder(
             // category is a foreign key, so an unresolved name would throw on the first insert.
             val categoryId = categoryIdsByName[entry.categoryName] ?: return@forEachIndexed
 
+            val occurredAt = today
+                .minusDays(entry.daysAgo.toLong())
+                .atTime(9 + (index * 3) % 11, 30)
+                .atZone(clock.zone)
+                .toInstant()
+                .toEpochMilli()
+
+            // A real capture row for the scanned ones, marked confirmed, so the link the detail screen
+            // reads ("From a receipt photo") points at a row that exists rather than at a made-up id.
+            val captureId = if (entry.fromReceipt) {
+                repository.recordCapture(
+                    sourceUri = "content://org.umn.lensspent.demo/receipt-${index + 1}.jpg",
+                    source = CaptureSource.PICKER,
+                    capturedAt = occurredAt
+                ).also { id -> repository.updateCaptureStatus(id, CaptureStatus.CONFIRMED) }
+            } else {
+                null
+            }
+
             repository.addTransaction(
                 merchant = entry.merchant,
                 amount = entry.amountRupiah,
                 categoryId = categoryId,
-                occurredAt = today
-                    .minusDays(entry.daysAgo.toLong())
-                    .atTime(9 + (index * 3) % 11, 30)
-                    .atZone(clock.zone)
-                    .toInstant()
-                    .toEpochMilli(),
-                note = entry.note
+                occurredAt = occurredAt,
+                note = entry.note,
+                captureId = captureId
             )
         }
         return true

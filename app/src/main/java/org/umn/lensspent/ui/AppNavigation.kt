@@ -53,10 +53,13 @@ object AppRoutes {
     const val AddExpense = "add-expense"
     const val Review = "review/{$CaptureIdArg}"
     const val Transaction = "transaction/{$TransactionIdArg}"
+    const val EditExpense = "edit-expense/{$TransactionIdArg}"
 
     fun review(captureId: Long): String = "review/$captureId"
 
     fun transaction(transactionId: Long): String = "transaction/$transactionId"
+
+    fun editExpense(transactionId: Long): String = "edit-expense/$transactionId"
 }
 
 /**
@@ -163,9 +166,24 @@ fun LensSpentNavHost(
             TransactionDetailScreen(
                 transactionId = transactionId,
                 onBack = { navController.popBackStack() },
+                onEdit = { navController.navigate(AppRoutes.editExpense(transactionId)) },
                 onNavigateToHome = {
                     navController.popBackStack(route = AppRoutes.Home, inclusive = false)
                 }
+            )
+        }
+
+        composable(
+            route = AppRoutes.EditExpense,
+            arguments = listOf(navArgument(TransactionIdArg) { type = NavType.LongType })
+        ) { entry ->
+            val transactionId = entry.arguments?.getLong(TransactionIdArg) ?: return@composable
+            AddExpenseScreen(
+                transactionId = transactionId,
+                onBack = { navController.popBackStack() },
+                // Back to the detail screen that opened this form, which is observing the row and
+                // therefore already showing the corrected values.
+                onSaved = { navController.popBackStack() }
             )
         }
 

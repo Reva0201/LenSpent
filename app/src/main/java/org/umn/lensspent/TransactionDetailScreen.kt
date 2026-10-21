@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,6 +66,7 @@ import org.umn.lensspent.ui.theme.Spacing
 fun TransactionDetailScreen(
     transactionId: Long,
     onBack: () -> Unit,
+    onEdit: () -> Unit,
     onNavigateToHome: () -> Unit,
     viewModel: TransactionDetailViewModel = viewModel(
         key = "transaction-detail-$transactionId",
@@ -100,6 +102,13 @@ fun TransactionDetailScreen(
                 },
                 actions = {
                     if (uiState is TransactionDetailUiState.Found) {
+                        IconButton(onClick = onEdit) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit this expense",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                         IconButton(onClick = viewModel::requestDelete) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
