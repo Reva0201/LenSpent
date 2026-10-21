@@ -321,7 +321,7 @@ private fun BudgetHero(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.extraLarge)
-            .background(Brush.linearGradient(listOf(hero.start, hero.end)))
+            .background(Brush.verticalGradient(listOf(hero.start, hero.end)))
             .padding(horizontal = Spacing.xxl, vertical = Spacing.xxl)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
