@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 
@@ -68,12 +69,15 @@ private val BarSpring = spring<Float>(dampingRatio = 0.6f, stiffness = 400f)
  *
  * @param data bar values, in Rupiah
  * @param labels one X-axis label per bar
+ * @param barAreaHeight how tall the plot area is. The dashboard wants a compact 160dp strip; the
+ *   analytics compartments are taller and would otherwise leave a dead band under the chart.
  */
 @Composable
 fun SpendingBarChart(
     data: List<Float>,
     labels: List<String>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    barAreaHeight: Dp = ChartDimens.Height
 ) {
     var selectedBarIndex by remember(data) { mutableStateOf<Int?>(null) }
 
@@ -130,7 +134,7 @@ fun SpendingBarChart(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(ChartDimens.Height + ChartDimens.VerticalPadding * 2)
+                .height(barAreaHeight + ChartDimens.VerticalPadding * 2)
                 .pointerInput(data, axisGutter) {
                     detectTapGestures { offset ->
                         val gutter = axisGutter.toPx()
@@ -228,7 +232,11 @@ fun SpendingBarChart(
                         contentAlignment = Alignment.BottomCenter
                     ) {
                         if (selectedBarIndex == index) {
-                            BarTooltip(fraction = barFractions[index], amount = amount)
+                            BarTooltip(
+                                fraction = barFractions[index],
+                                amount = amount,
+                                barAreaHeight = barAreaHeight
+                            )
                         }
                     }
                 }
@@ -266,11 +274,12 @@ fun SpendingBarChart(
 @Composable
 private fun BarTooltip(
     fraction: State<Float>,
-    amount: Float
+    amount: Float,
+    barAreaHeight: Dp
 ) {
     Surface(
         modifier = Modifier
-            .offset(y = -(ChartDimens.Height * fraction.value))
+            .offset(y = -(barAreaHeight * fraction.value))
             .height(ChartDimens.TooltipHeight)
             .wrapContentWidth(unbounded = true),
         shape = MaterialTheme.shapes.small,

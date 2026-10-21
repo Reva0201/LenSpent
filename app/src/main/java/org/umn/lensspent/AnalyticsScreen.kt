@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -69,6 +70,12 @@ private object AnalyticsDimens {
      * shrinking on one tab only.
      */
     val PagerHeight = 336.dp
+    /**
+     * The plot area of the analytics chart. Sized so a compartment is fully used without clipping the
+     * axis labels: header band (48) + gap (8) + plot + vertical padding (32) + labels (~24) has to fit
+     * inside [PagerHeight], which leaves 224dp for the plot.
+     */
+    val ChartHeight = 214.dp
     val Gutter = 16.dp
     val VerticalGap = 8.dp
     val SheetCorner = 32.dp
@@ -268,9 +275,15 @@ private fun ChartPage(
             ),
         verticalArrangement = Arrangement.spacedBy(AnalyticsDimens.VerticalGap)
     ) {
-        // A fixed-height band, so the chart starts on the same line in every compartment
+        // A fixed-height band, so the chart starts on the same line in every compartment. The plot
+        // area itself is taller than the dashboard's strip: the compartment is 336dp and a 160dp chart
+        // left a dead band between the chart and the history sheet.
         HeaderSlot { header() }
-        SpendingBarChart(data = data, labels = labels)
+        SpendingBarChart(
+            data = data,
+            labels = labels,
+            barAreaHeight = AnalyticsDimens.ChartHeight
+        )
     }
 }
 
@@ -328,9 +341,18 @@ private fun DailySummaryPage(
         }
 
         // The space under the headline is dead on this tab: the pager reserves a fixed height so the
-        // three compartments stay put, and only the chart tabs fill it. The day's two numbers go here.
+        // three compartments stay put, and only the chart tabs fill it. The day's two numbers go here,
+        // stretched to the bottom of the compartment so the tab is not half empty.
         if (state.hasPurchases) {
-            DayStatRow(summary = state.selectedDay)
+            // The row keeps its natural height and is centred in what is left of the compartment:
+            // stretching the cards to fill it left each card with a hole in the middle, because their
+            // icon sits at the top and their numbers at the bottom.
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                DayStatRow(summary = state.selectedDay)
+            }
         }
     }
 }
@@ -342,9 +364,9 @@ private fun DailySummaryPage(
  * zero already guarantees - the check is here so the cards cannot render a placeholder amount.
  */
 @Composable
-private fun DayStatRow(summary: DaySummary) {
+private fun DayStatRow(summary: DaySummary, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(AnalyticsDimens.StatRowHeight),
         horizontalArrangement = Arrangement.spacedBy(AnalyticsDimens.TxCardSpacing)
