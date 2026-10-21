@@ -341,7 +341,9 @@ private fun BudgetHero(
             // card lifts off the page without a drop shadow underneath it.
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.12f),
+                // The card's own content colour, not a literal white: in dark mode the hero's ink is a
+                // pale blue-white, and a fixed white edge would be brighter than the text it frames.
+                color = hero.content.copy(alpha = 0.12f),
                 shape = MaterialTheme.shapes.extraLarge
             )
             .padding(horizontal = Spacing.xxl, vertical = Spacing.xxl)

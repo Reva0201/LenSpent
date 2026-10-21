@@ -299,6 +299,10 @@ internal fun SaveConfirmationDialog(saved: SavedExpense, onDismiss: () -> Unit) 
  */
 @Composable
 private fun SavedCheck(progress: () -> Float) {
+    // Read outside the draw scope: a Canvas lambda is not composable, so the role has to be resolved
+    // before the drawing starts.
+    val tickColor = MaterialTheme.colorScheme.onPrimary
+
     Box(
         modifier = Modifier.size(76.dp),
         contentAlignment = Alignment.Center
@@ -332,7 +336,10 @@ private fun SavedCheck(progress: () -> Float) {
                 )
                 drawPath(
                     path = drawn,
-                    color = Color.White,
+                    // The tick sits on `primary`, so it is drawn in `onPrimary` rather than white: the
+                    // two roles are the same in light mode and different in dark, which is exactly why
+                    // the role exists.
+                    color = tickColor,
                     style = Stroke(
                         width = 3.dp.toPx(),
                         cap = StrokeCap.Round,
