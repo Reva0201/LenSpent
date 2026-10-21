@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.umn.lensspent.SubscriptionStopTimeoutMillis
+import org.umn.lensspent.data.local.NoBudgetIdr
 import org.umn.lensspent.data.local.ThemePreference
 import org.umn.lensspent.data.local.UserPreferencesRepository
 import org.umn.lensspent.data.model.Transaction
@@ -24,7 +25,9 @@ private val CsvColumns = listOf("Date", "Merchant", "Category", "Amount (IDR)", 
 /** What the settings screen draws. */
 data class SettingsUiState(
     val username: String = "",
-    val themePreference: ThemePreference = ThemePreference.Default
+    val themePreference: ThemePreference = ThemePreference.Default,
+    /** The ceiling chosen at onboarding or here, or [NoBudgetIdr] when there is none. */
+    val monthlyBudgetIdr: Long = NoBudgetIdr
 )
 
 /**
@@ -49,7 +52,8 @@ class SettingsViewModel(
         preferences.preferences.map { stored ->
             SettingsUiState(
                 username = stored?.username.orEmpty(),
-                themePreference = stored?.themePreference ?: ThemePreference.Default
+                themePreference = stored?.themePreference ?: ThemePreference.Default,
+                monthlyBudgetIdr = stored?.monthlyBudgetIdr ?: NoBudgetIdr
             )
         }.stateIn(
             scope = viewModelScope,
@@ -59,6 +63,17 @@ class SettingsViewModel(
 
     fun onThemeSelected(preference: ThemePreference) {
         viewModelScope.launch { preferences.setThemePreference(preference) }
+    }
+
+    /**
+     * Stores the new ceiling, or clears it back to none when the dialog was saved empty.
+     *
+     * A whole number of Rupiah rather than text: a half-typed number lives in the dialog and dies with
+     * it, and only something that parsed into an amount reaches this point. Zero is the same answer as
+     * empty - "no ceiling" - because IDR has no minor unit and no one budgets Rp 0.
+     */
+    fun onBudgetConfirmed(amount: Long) {
+        viewModelScope.launch { preferences.setMonthlyBudgetIdr(amount) }
     }
 
     /**

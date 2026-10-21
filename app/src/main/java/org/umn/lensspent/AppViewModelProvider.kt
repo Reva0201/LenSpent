@@ -17,7 +17,12 @@ internal const val SubscriptionStopTimeoutMillis = 5_000L
 object AppViewModelProvider {
 
     val Factory = viewModelFactory {
-        initializer { HomeViewModel(application().container.transactionRepository) }
+        initializer {
+            HomeViewModel(
+                repository = application().container.transactionRepository,
+                preferences = application().container.userPreferencesRepository
+            )
+        }
         initializer { AnalyticsViewModel(application().container.transactionRepository) }
         initializer { CameraViewModel(application().container.transactionRepository) }
         initializer {
@@ -34,6 +39,24 @@ object AppViewModelProvider {
             SettingsViewModel(
                 preferences = application().container.userPreferencesRepository,
                 ledger = application().container.transactionRepository
+            )
+        }
+        initializer { AddExpenseViewModel(application().container.transactionRepository) }
+    }
+
+    /**
+     * A factory for the detail screen, which needs the row it was opened for.
+     *
+     * Built per id rather than added to [Factory] because the id is an argument, not a dependency: the
+     * screen cannot be constructed meaningfully without it. The caller passes the same id as the
+     * composable's `viewModel(key = ...)`, so two detail screens in the back stack never share one
+     * ViewModel and observe each other's row.
+     */
+    fun transactionDetailFactory(transactionId: Long): ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            TransactionDetailViewModel(
+                repository = application().container.transactionRepository,
+                transactionId = transactionId
             )
         }
     }

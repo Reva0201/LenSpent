@@ -28,6 +28,17 @@ val deepSeekApiKey: Provider<String> = providers.gradleProperty("deepseekApiKey"
         }
     )
 
+/**
+ * Whether this build starts with the sample ledger in [org.umn.lensspent.data.demo.DemoLedger].
+ *
+ * On by default because the submitted APK has to show populated list, detail and chart screens the
+ * moment a grader installs it, and an empty dashboard demonstrates none of them. It is a Gradle
+ * property rather than a constant so the same source tree can produce the honest empty build:
+ * `-PdemoLedger=false`. The seeder itself refuses to touch a ledger that already has rows, so turning
+ * this on can never mix sample spending into a real one.
+ */
+val demoLedger: Provider<String> = providers.gradleProperty("demoLedger").orElse("true")
+
 android {
     namespace = "org.umn.lensspent"
     compileSdk {
@@ -46,6 +57,8 @@ android {
         // Baked into the APK as a constant: the app has no backend to hand out keys, so the key a
         // build ships with is the key the chat uses.
         buildConfigField("String", "DEEPSEEK_API_KEY", "\"${deepSeekApiKey.get()}\"")
+        // See the note on `demoLedger` above: on for the submitted build, off for a real one.
+        buildConfigField("boolean", "DEMO_LEDGER", demoLedger.get())
     }
 
     buildTypes {

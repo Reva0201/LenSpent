@@ -55,6 +55,8 @@ internal class FakeTransactionRepository : TransactionRepository {
 
     override fun observeTransactions(limit: Int): Flow<List<Transaction>> = unused()
 
+    override fun observeTransaction(id: Long): Flow<Transaction?> = unused()
+
     override fun observeTransactionsBetween(fromMillis: Long, toMillis: Long): Flow<List<Transaction>> =
         unused()
 

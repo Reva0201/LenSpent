@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -42,7 +43,7 @@ class UserPreferencesRepositoryTest {
     }
 
     @Test
-    fun `a fresh install follows the phone's theme and has no name`() = runBlocking {
+    fun `a fresh install follows the phone's theme and has no name or budget`() = runBlocking {
         val repository = repository()
 
         assertEquals(UserPreferences(), repository.preferences.first())
@@ -50,6 +51,7 @@ class UserPreferencesRepositoryTest {
         assertFalse(repository.hasCompletedOnboarding.first())
         assertEquals("", repository.username.first())
         assertEquals(ThemePreference.SYSTEM, repository.themePreference.first())
+        assertEquals(NoBudgetIdr, repository.monthlyBudgetIdr.first())
     }
 
     @Test
@@ -88,15 +90,61 @@ class UserPreferencesRepositoryTest {
     }
 
     @Test
-    fun `finishing onboarding stores the name and the flag together`() = runBlocking {
+    fun `finishing onboarding stores the name, the ceiling and the flag together`() = runBlocking {
         val repository = repository()
 
-        repository.saveOnboardingProfile("Sari")
+        repository.saveOnboardingProfile("Sari", 4_500_000L)
+
+        assertEquals(
+            UserPreferences(
+                hasCompletedOnboarding = true,
+                username = "Sari",
+                monthlyBudgetIdr = 4_500_000L
+            ),
+            repository.preferences.first()
+        )
+    }
+
+    /** Skipping the budget is a real answer, and the only one the dashboard may not invent for itself. */
+    @Test
+    fun `finishing onboarding with the budget left blank stores no ceiling`() = runBlocking {
+        val repository = repository()
+
+        repository.saveOnboardingProfile("Sari", NoBudgetIdr)
 
         assertEquals(
             UserPreferences(hasCompletedOnboarding = true, username = "Sari"),
             repository.preferences.first()
         )
+    }
+
+    /**
+     * A number under its own key, not text: the dashboard reads this as an amount, and a value stored
+     * as "3.750.000" would come back needing the parser that wrote it.
+     */
+    @Test
+    fun `a budget is stored as whole Rupiah under its own key`() = runBlocking {
+        val store = dataStore()
+        val repository = UserPreferencesRepository(store)
+
+        repository.setMonthlyBudgetIdr(3_750_000L)
+
+        assertEquals(3_750_000L, store.data.first()[longPreferencesKey("monthly_budget_idr")])
+    }
+
+    /** A ceiling set in Settings is not a one-way door: it has to be changeable and removable. */
+    @Test
+    fun `a budget set later can be changed and cleared again`() = runBlocking {
+        val repository = repository()
+
+        repository.setMonthlyBudgetIdr(3_750_000L)
+        assertEquals(3_750_000L, repository.monthlyBudgetIdr.first())
+
+        repository.setMonthlyBudgetIdr(5_000_000L)
+        assertEquals(5_000_000L, repository.monthlyBudgetIdr.first())
+
+        repository.setMonthlyBudgetIdr(NoBudgetIdr)
+        assertEquals(NoBudgetIdr, repository.monthlyBudgetIdr.first())
     }
 
     @Test

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,14 +38,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
 import kotlinx.coroutines.launch
+import org.umn.lensspent.data.DaySummary
 import org.umn.lensspent.data.SpendingAggregator
 import org.umn.lensspent.data.model.Transaction
+import org.umn.lensspent.ui.components.CategoryBadge
 
 private val AnalyticsTabs = listOf("Daily", "Weekly", "Yearly")
 
@@ -67,6 +73,11 @@ private object AnalyticsDimens {
     val TxChipSize = 40.dp
     val TxGlyphSize = 20.dp
     val InlineContextPadding = 4.dp
+
+    /** Daily stat cards: tall enough to breathe, shallow enough to still fit inside [PagerHeight]. */
+    val StatRowHeight = 112.dp
+    val StatIconSize = 18.dp
+    val StatInnerGap = 4.dp
 }
 
 /**
@@ -248,6 +259,100 @@ private fun DailySummaryPage(
                 modifier = Modifier.padding(bottom = AnalyticsDimens.InlineContextPadding)
             )
         }
+
+        // The space under the headline is dead on this tab: the pager reserves a fixed height so the
+        // three compartments stay put, and only the chart tabs fill it. The day's two numbers go here.
+        if (state.hasPurchases) {
+            DayStatRow(summary = state.selectedDay)
+        }
+    }
+}
+
+/**
+ * The selected day's two numbers, side by side: how many expenses were logged, and the largest.
+ *
+ * The biggest-expense card only exists when the day has one, which [DaySummary.purchaseCount] above
+ * zero already guarantees - the check is here so the cards cannot render a placeholder amount.
+ */
+@Composable
+private fun DayStatRow(summary: DaySummary) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(AnalyticsDimens.StatRowHeight),
+        horizontalArrangement = Arrangement.spacedBy(AnalyticsDimens.TxCardSpacing)
+    ) {
+        StatCard(
+            icon = Icons.Filled.Receipt,
+            value = summary.purchaseCount.toString(),
+            label = if (summary.purchaseCount == 1) "purchase" else "purchases",
+            supporting = null,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+        )
+        summary.largest?.let { largest ->
+            StatCard(
+                // The same category icon the expense carries in the history list below.
+                icon = categoryIcon(largest.category.iconKey),
+                value = formatIDR(largest.amount),
+                label = "biggest expense",
+                supporting = largest.merchant,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            )
+        }
+    }
+}
+
+/** One daily stat card, drawn with the same surface recipe as a history row. */
+@Composable
+private fun StatCard(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    supporting: String?,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(AnalyticsDimens.TxCardPadding),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(AnalyticsDimens.StatIconSize)
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(AnalyticsDimens.StatInnerGap)) {
+            // The number carries the scale's own weight rather than a bold override, so this card and
+            // the dashboard's two stat cards read at the same emphasis.
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (supporting != null) {
+                Text(
+                    text = supporting,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 
@@ -260,7 +365,7 @@ private fun TransactionHistorySheet(transactions: List<Transaction>) {
             topStart = AnalyticsDimens.SheetCorner,
             topEnd = AnalyticsDimens.SheetCorner
         ),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Column(
             modifier = Modifier.padding(
@@ -272,8 +377,7 @@ private fun TransactionHistorySheet(transactions: List<Transaction>) {
         ) {
             Text(
                 text = HistoryTitle,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleMedium
             )
 
             LazyColumn(
@@ -298,42 +402,31 @@ private fun TransactionHistorySheet(transactions: List<Transaction>) {
     }
 }
 
-/** Single transaction card: icon chip, merchant details and the Rupiah amount. */
+/** Single transaction card: the same category badge the dashboard uses, then the Rupiah amount. */
 @Composable
 private fun TransactionRow(txn: Transaction) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(AnalyticsDimens.TxCardPadding),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
+            modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(AnalyticsDimens.TxCardSpacing),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(AnalyticsDimens.TxChipSize)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = categoryIcon(txn.category.iconKey),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(AnalyticsDimens.TxGlyphSize)
-                )
-            }
+            CategoryBadge(category = txn.category)
             Column {
                 Text(
                     text = txn.merchant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "${txn.category.name} • ${formatTransactionDate(txn.occurredAt)}",
@@ -344,8 +437,7 @@ private fun TransactionRow(txn: Transaction) {
         }
         Text(
             text = formatIDR(txn.amount),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
     }

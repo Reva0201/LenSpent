@@ -3,6 +3,7 @@ package org.umn.lensspent.data
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.umn.lensspent.data.model.Category
 import org.umn.lensspent.data.model.Transaction
@@ -30,6 +31,16 @@ class SpendingAggregatorTest {
         category = category,
         occurredAt = date.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
     )
+
+    /** Pins the clock time as well, for the tests that sit on the edges of a day. */
+    private fun transactionAt(date: LocalDate, hour: Int, minute: Int, amount: Long): Transaction =
+        Transaction(
+            id = nextId++,
+            merchant = "Test Merchant",
+            amount = amount,
+            category = category,
+            occurredAt = date.atTime(hour, minute).atZone(zone).toInstant().toEpochMilli()
+        )
 
     @Test
     fun `weekStart returns the Monday of the containing week`() {
@@ -102,6 +113,60 @@ class SpendingAggregatorTest {
 
         assertEquals(200_000L, SpendingAggregator.totalOn(transactions, friday, zone))
         assertEquals(0L, SpendingAggregator.totalOn(transactions, LocalDate.of(2026, 9, 15), zone))
+    }
+
+    @Test
+    fun `daySummary counts the selected day down to the minute`() {
+        val transactions = listOf(
+            transactionAt(friday.minusDays(1), 23, 59, 10_000L),   // the minute before
+            transactionAt(friday, 0, 0, 20_000L),                  // local midnight
+            transactionAt(friday, 12, 30, 30_000L),
+            transactionAt(friday.plusDays(1), 0, 0, 40_000L)       // the minute after
+        )
+
+        val summary = SpendingAggregator.daySummary(transactions, friday, zone)
+
+        assertEquals(2, summary.purchaseCount)
+    }
+
+    @Test
+    fun `daySummary names the biggest expense of the day, not of the ledger`() {
+        val large = transactionOn(friday, 250_000L)
+        val transactions = listOf(
+            transactionOn(friday, 30_000L),
+            large,
+            transactionOn(friday.minusDays(1), 9_000_000L)
+        )
+
+        val summary = SpendingAggregator.daySummary(transactions, friday, zone)
+
+        assertEquals(2, summary.purchaseCount)
+        assertEquals(large.id, summary.largest?.id)
+    }
+
+    /** Two identical amounts must not leave the card flipping between them on every recomposition. */
+    @Test
+    fun `daySummary sends an amount tie to the later expense, whatever order the rows arrive in`() {
+        val earlier = transactionAt(friday, 9, 0, 100_000L)
+        val later = transactionAt(friday, 18, 0, 100_000L)
+
+        val forwards = SpendingAggregator.daySummary(listOf(earlier, later), friday, zone)
+        val backwards = SpendingAggregator.daySummary(listOf(later, earlier), friday, zone)
+
+        assertEquals(later.id, forwards.largest?.id)
+        assertEquals(later.id, backwards.largest?.id)
+    }
+
+    @Test
+    fun `daySummary of a day with nothing on it is empty`() {
+        val summary = SpendingAggregator.daySummary(
+            listOf(transactionOn(friday, 10_000L)),
+            friday.minusDays(1),
+            zone
+        )
+
+        assertEquals(0, summary.purchaseCount)
+        assertNull(summary.largest)
     }
 
     @Test

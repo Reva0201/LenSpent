@@ -39,6 +39,39 @@ object SpendingAggregator {
         zone: ZoneId = ZoneId.systemDefault()
     ): Long = transactions.sumOf { if (it.localDate(zone) == date) it.amount else 0L }
 
+    /**
+     * Orders expenses so the largest wins, and an amount tie goes to the later expense.
+     *
+     * The tie-break is what keeps the daily "biggest expense" card from flipping between two rows of
+     * equal amount - the queries happen to return newest first, but nothing here should depend on it.
+     */
+    private val LargestFirst: Comparator<Transaction> =
+        compareBy<Transaction> { it.amount }.thenBy { it.occurredAt }.thenBy { it.id }
+
+    /**
+     * What [date] adds up to: how many expenses it holds and the largest of them, in a single pass.
+     *
+     * [DaySummary.largest] is non-null whenever [DaySummary.purchaseCount] is above zero: both are
+     * written as each row of the date is seen, so the summary can never count rows it cannot name.
+     */
+    fun daySummary(
+        transactions: List<Transaction>,
+        date: LocalDate,
+        zone: ZoneId = ZoneId.systemDefault()
+    ): DaySummary {
+        var purchaseCount = 0
+        var largest: Transaction? = null
+        transactions.forEach { transaction ->
+            if (transaction.localDate(zone) != date) return@forEach
+            purchaseCount++
+            val current = largest
+            if (current == null || LargestFirst.compare(transaction, current) > 0) {
+                largest = transaction
+            }
+        }
+        return DaySummary(purchaseCount = purchaseCount, largest = largest)
+    }
+
     /** Seven Monday-first buckets covering the week that starts at [start]. */
     fun dailySeries(
         transactions: List<Transaction>,
@@ -75,6 +108,17 @@ object SpendingAggregator {
     fun startOfDayMillis(date: LocalDate, zone: ZoneId = ZoneId.systemDefault()): Long =
         date.atStartOfDay(zone).toInstant().toEpochMilli()
 }
+
+/**
+ * What a single day holds: the number of expenses logged on it, and the largest of them.
+ *
+ * Kept as one type because the daily summary reads both from the same pass, and because a count with
+ * no largest row is a state the aggregator never produces.
+ */
+data class DaySummary(
+    val purchaseCount: Int = 0,
+    val largest: Transaction? = null
+)
 
 /** Local calendar date the expense happened on, in [zone]. */
 fun Transaction.localDate(zone: ZoneId = ZoneId.systemDefault()): LocalDate =

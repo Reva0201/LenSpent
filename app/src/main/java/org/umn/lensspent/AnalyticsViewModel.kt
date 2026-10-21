@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import org.umn.lensspent.data.DaySummary
 import org.umn.lensspent.data.SpendingAggregator
 import org.umn.lensspent.data.model.Transaction
 import org.umn.lensspent.data.repository.TransactionRepository
@@ -29,12 +30,21 @@ data class AnalyticsUiState(
     val today: LocalDate,
     val selectedDate: LocalDate = today,
     val selectedDateTotal: Long = 0L,
+    /**
+     * The selected day's row count and its largest expense.
+     *
+     * One field rather than two, so a state that counts expenses it cannot name cannot be built.
+     */
+    val selectedDay: DaySummary = DaySummary(),
     val weekStart: LocalDate = SpendingAggregator.weekStart(today),
     val weekSeries: List<Float> = List(SpendingAggregator.DaysInWeek) { 0f },
     val year: Int = today.year,
     val yearSeries: List<Float> = List(SpendingAggregator.MonthsInYear) { 0f },
     val history: List<Transaction> = emptyList()
 ) {
+    /** Whether the selected day has anything to summarise. */
+    val hasPurchases: Boolean get() = selectedDay.purchaseCount > 0
+
     val canStepForwardDay: Boolean get() = selectedDate.isBefore(today)
 
     /** The week containing today is the newest one there is. */
@@ -71,6 +81,7 @@ class AnalyticsViewModel(
             today = today,
             selectedDate = selectedDate,
             selectedDateTotal = SpendingAggregator.totalOn(transactions, selectedDate, zone),
+            selectedDay = SpendingAggregator.daySummary(transactions, selectedDate, zone),
             weekStart = weekStart,
             weekSeries = SpendingAggregator.dailySeries(transactions, weekStart, zone),
             year = today.year,

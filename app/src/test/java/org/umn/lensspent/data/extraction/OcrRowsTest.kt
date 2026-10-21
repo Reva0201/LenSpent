@@ -42,6 +42,26 @@ class OcrRowsTest {
         assertEquals(38_000L, draft.amountRupiah)
     }
 
+    /**
+     * The pipeline's own path: the boxes ML Kit returned, not the flattened rows the test above feeds
+     * the parser. `rowsOf` drops every box, and flattened lines then all measure the same, so a
+     * size-ranked merchant pick says "Alfamart" above while still naming an item off a real capture.
+     * Reading order is what the paper printed, and the store's name is the first thing on it.
+     */
+    @Test
+    fun `names the store on the top row rather than a taller item row below it`() {
+        val recognized = RecognizedText(
+            text = AlfamartReceipt.joinToString("\n") { it.text },
+            lines = rowsOf(AlfamartReceipt),
+            ocrLines = AlfamartReceipt
+        )
+
+        val draft = ReceiptParser.parseLines(recognized)
+
+        assertEquals("Alfamart", draft.merchant)
+        assertEquals(38_000L, draft.amountRupiah)
+    }
+
     @Test
     fun `merges the halves of one printed row`() {
         // The recognizer reports the left half and the right half of a row as separate lines, a few

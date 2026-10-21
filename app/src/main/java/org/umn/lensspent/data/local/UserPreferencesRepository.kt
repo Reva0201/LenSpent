@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import java.io.IOException
@@ -47,11 +48,27 @@ enum class ThemePreference(val storageValue: String) {
     }
 }
 
+/**
+ * No monthly ceiling has been chosen.
+ *
+ * Zero rather than a plausible-looking number: the dashboard greets a budget the user set and says
+ * nothing about one they did not, and an invented default would put a "budget" on screen that was never
+ * anyone's. It is also why this is a named constant - "no budget" is a state, not an amount.
+ */
+const val NoBudgetIdr: Long = 0L
+
 /** Everything stored, with the values a fresh install starts from. */
 data class UserPreferences(
     val hasCompletedOnboarding: Boolean = false,
     val username: String = "",
-    val themePreference: ThemePreference = ThemePreference.SYSTEM
+    val themePreference: ThemePreference = ThemePreference.SYSTEM,
+    /**
+     * The monthly ceiling the user typed, in whole Rupiah, or [NoBudgetIdr] if they left it blank.
+     *
+     * It lives here rather than in the ledger because it is a choice about the app's behaviour, not a
+     * spending row: the dashboard needs it on every frame, and it is not something the user spends.
+     */
+    val monthlyBudgetIdr: Long = NoBudgetIdr
 )
 
 /**
@@ -75,8 +92,8 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
      * The stored bytes, with a corrupt file degraded to empty rather than fatal.
      *
      * Every value here has a default a fresh install already uses, so the worst a damaged file can
-     * cost the user is choosing their name and their theme again. Crashing on launch, before the first
-     * frame is drawn, would cost them the app.
+     * cost the user is choosing their name, their budget and their theme again. Crashing on launch,
+     * before the first frame is drawn, would cost them the app.
      */
     private val stored: Flow<Preferences> = dataStore.data.catch { failure ->
         if (failure is IOException) emit(emptyPreferences()) else throw failure
@@ -89,6 +106,9 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
     val themePreference: Flow<ThemePreference> =
         stored.map { ThemePreference.fromStorage(it[Keys.ThemePreference]) }
+
+    /** Whole Rupiah, or [NoBudgetIdr] when the user has not chosen a ceiling. */
+    val monthlyBudgetIdr: Flow<Long> = stored.map { it[Keys.MonthlyBudgetIdr] ?: NoBudgetIdr }
 
     /**
      * All of it at once, or null until the first read lands.
@@ -111,16 +131,22 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { it[Keys.ThemePreference] = preference.storageValue }
     }
 
+    /** Sets the ceiling, or clears it back to [NoBudgetIdr] when the user empties the field. */
+    suspend fun setMonthlyBudgetIdr(amount: Long) {
+        dataStore.edit { it[Keys.MonthlyBudgetIdr] = amount }
+    }
+
     /**
-     * The two writes onboarding finishes with, in one transaction.
+     * The three writes onboarding finishes with, in one transaction.
      *
      * Separate writes would leave a window - brief, but real - in which onboarding reads as finished
-     * while the name it collected has not landed, and the dashboard would greet the user by the
-     * default name.
+     * while the name and the ceiling it collected have not landed, and the dashboard would greet the
+     * user by the default name with nothing behind the progress bar.
      */
-    suspend fun saveOnboardingProfile(username: String) {
+    suspend fun saveOnboardingProfile(username: String, monthlyBudgetIdr: Long) {
         dataStore.edit { preferences ->
             preferences[Keys.Username] = username.trim()
+            preferences[Keys.MonthlyBudgetIdr] = monthlyBudgetIdr
             preferences[Keys.HasCompletedOnboarding] = true
         }
     }
@@ -130,10 +156,12 @@ private object Keys {
     val HasCompletedOnboarding = booleanPreferencesKey("has_completed_onboarding")
     val Username = stringPreferencesKey("username")
     val ThemePreference = stringPreferencesKey("theme_preference")
+    val MonthlyBudgetIdr = longPreferencesKey("monthly_budget_idr")
 }
 
 private fun Preferences.toUserPreferences(): UserPreferences = UserPreferences(
     hasCompletedOnboarding = this[Keys.HasCompletedOnboarding] ?: false,
     username = this[Keys.Username] ?: "",
-    themePreference = ThemePreference.fromStorage(this[Keys.ThemePreference])
+    themePreference = ThemePreference.fromStorage(this[Keys.ThemePreference]),
+    monthlyBudgetIdr = this[Keys.MonthlyBudgetIdr] ?: NoBudgetIdr
 )

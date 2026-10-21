@@ -16,8 +16,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.umn.lensspent.data.local.ThemePreference
-import org.umn.lensspent.data.local.UserPreferences
 import org.umn.lensspent.ui.LensSpentNavHost
+import org.umn.lensspent.ui.launchRoute
 import org.umn.lensspent.ui.theme.LensSpentTheme
 
 /**
@@ -48,7 +48,17 @@ class MainActivity : ComponentActivity() {
                 systemInDarkTheme = isSystemInDarkTheme()
             )
 
-
+            // Re-applied on every theme change, which is the only way the bar icons can follow a theme
+            // the user forced: `enableEdgeToEdge()` above ran before DataStore answered, and a forced
+            // Dark on a phone left in light mode is exactly the case its own defaults get wrong. See
+            // `systemBarStyle`.
+            DisposableEffect(darkTheme) {
+                enableEdgeToEdge(
+                    statusBarStyle = systemBarStyle(darkTheme),
+                    navigationBarStyle = systemBarStyle(darkTheme)
+                )
+                onDispose { }
+            }
 
             LensSpentTheme(
                 darkTheme = darkTheme,
@@ -58,11 +68,19 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val snapshot = stored ?: UserPreferences()
-                    LensSpentNavHost(
-                        hasCompletedOnboarding = snapshot.hasCompletedOnboarding,
-                        username = snapshot.username
-                    )
+                    // The graph is built once the store has answered, and not a frame earlier: the
+                    // answer decides whether this launch is a first run, and a first run is the one
+                    // thing an unread store looks exactly like. The surface above is what fills those
+                    // few milliseconds, so waiting costs a frame of background rather than a decision.
+                    val snapshot = stored
+                    val startRoute = launchRoute(snapshot)
+
+                    if (snapshot != null && startRoute != null) {
+                        LensSpentNavHost(
+                            startDestination = startRoute,
+                            username = snapshot.username
+                        )
+                    }
                 }
             }
         }

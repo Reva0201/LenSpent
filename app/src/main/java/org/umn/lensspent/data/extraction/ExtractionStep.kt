@@ -25,9 +25,9 @@ enum class ExtractionStage(val label: String) {
  * One thing the pipeline just did, and what it found out by doing it.
  *
  * This is a debug tap, not a contract. The pipeline reports to it and nothing reads it back into a
- * decision: the values in [detail] are for a human watching a slow extraction, and no stage may
- * behave differently because somebody is listening. That is what lets the confirmation sheet show
- * exactly which stage a receipt is stuck in - or prove that the model was never needed at all.
+ * decision: the values in [detail] are for a human reading logcat after a slow extraction, and no
+ * stage may behave differently because somebody is listening. That is what lets a receipt that read
+ * badly be explained afterwards - or prove that the model was never needed at all.
  *
  * Kept free of Android and of clocks, so the pipeline stays testable on the JVM and every step's
  * timing is the listener's business.

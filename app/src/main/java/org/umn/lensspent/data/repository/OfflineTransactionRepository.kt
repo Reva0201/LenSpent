@@ -37,6 +37,16 @@ class OfflineTransactionRepository(
     override fun observeTransactionsBetween(fromMillis: Long, toMillis: Long): Flow<List<Transaction>> =
         withCategories(transactionDao.observeBetween(fromMillis, toMillis))
 
+    override fun observeTransaction(id: Long): Flow<Transaction?> =
+        combine(transactionDao.observeById(id), categoryDao.observeAll()) { entity, categories ->
+            // Nothing to join when the row is gone: the flow itself answers "gone", and the caller is
+            // expected to render that rather than treat it as a load that has not finished.
+            if (entity == null) return@combine null
+            val category = categories.firstOrNull { it.id == entity.categoryId }?.toModel()
+                ?: UncategorisedCategory
+            entity.toModel(category)
+        }
+
     override fun observeSumBetween(fromMillis: Long, toMillis: Long): Flow<Long> =
         transactionDao.observeSumBetween(fromMillis, toMillis)
 

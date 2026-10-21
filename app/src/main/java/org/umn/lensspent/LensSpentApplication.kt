@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.umn.lensspent.data.demo.DemoLedgerSeeder
 
 /**
  * Process-wide wiring. Manual dependency injection on purpose: one container, no annotation processor,
@@ -23,6 +24,13 @@ class LensSpentApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         // Room's Flow queries emit again on their own once this lands, so the screens can subscribe first.
-        applicationScope.launch { container.transactionRepository.seedIfEmpty() }
+        applicationScope.launch {
+            container.transactionRepository.seedIfEmpty()
+            // The demo ledger is a build-time decision, not a runtime one: a build compiled without it
+            // starts empty and stays empty, which is what the app does for a real user.
+            if (BuildConfig.DEMO_LEDGER) {
+                DemoLedgerSeeder(container.transactionRepository).seedIfEmpty()
+            }
+        }
     }
 }

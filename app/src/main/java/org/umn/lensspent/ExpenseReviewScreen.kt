@@ -49,7 +49,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -77,7 +76,6 @@ fun ExpenseReviewScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val finished by viewModel.finished.collectAsStateWithLifecycle()
-    val extractionTrace by viewModel.extractionTrace.collectAsStateWithLifecycle()
     val savedExpense by viewModel.savedExpense.collectAsStateWithLifecycle()
 
     LaunchedEffect(captureId) { viewModel.start(captureId) }
@@ -108,8 +106,7 @@ fun ExpenseReviewScreen(
     ) { paddingValues ->
         when (val state = uiState) {
             null, is ExpenseReviewUiState.Processing -> ProcessingPane(
-                modifier = Modifier.padding(paddingValues),
-                trace = extractionTrace
+                modifier = Modifier.padding(paddingValues)
             )
 
             is ExpenseReviewUiState.Unavailable -> UnavailablePane(
@@ -184,12 +181,11 @@ internal fun SaveConfirmationDialog(saved: SavedExpense, onDismiss: () -> Unit) 
 /**
  * First stage: the brief on-device work that happens before anything is editable.
  *
- * [trace] is the debug panel below it - the pipeline's own account of what it is doing - and it is
- * deliberately part of this pane rather than of the sheet: it disappears the moment there is
- * something to edit, so a receipt the fast path read leaves a single line and no model stage at all.
+ * It disappears the moment there is something to edit, so the machinery that read the photo is never
+ * the last thing on screen - what the photo became is.
  */
 @Composable
-private fun ProcessingPane(modifier: Modifier, trace: List<ExtractionTraceLine>) {
+private fun ProcessingPane(modifier: Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -207,48 +203,6 @@ private fun ProcessingPane(modifier: Modifier, trace: List<ExtractionTraceLine>)
                 text = "Runs on this device - nothing is uploaded.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (trace.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(20.dp))
-                ExtractionTracePanel(trace)
-            }
-        }
-    }
-}
-
-/**
- * Debug: how the receipt is being read, one stage at a time, while the sheet is not yet editable.
- *
- * This is the answer to "did the on-device model actually run, and what did it cost me": a receipt
- * the fast path read shows one line and never a model stage, while a fallback shows the load, the
- * generation and the model's own answer, in the order they happened. Monospaced so the times and
- * the stage names line up, and trimmed to the newest few lines so a slow first run cannot push the
- * spinner off the screen.
- */
-@Composable
-private fun ExtractionTracePanel(trace: List<ExtractionTraceLine>) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                shape = MaterialTheme.shapes.small
-            )
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        Text(
-            text = "DEBUG - how this receipt is being read",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        trace.forEach { line ->
-            Text(
-                text = "${elapsedLabel(line.elapsedMillis)}  " +
-                    "${line.step.stage.label}: ${line.step.detail}",
-                style = MaterialTheme.typography.labelSmall,
-                fontFamily = FontFamily.Monospace
             )
         }
     }

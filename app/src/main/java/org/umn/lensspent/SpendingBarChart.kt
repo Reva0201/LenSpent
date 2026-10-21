@@ -27,8 +27,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.drawText
@@ -175,21 +176,33 @@ fun SpendingBarChart(
                     }
                 }
 
-                // Bars: proportional to the chart height, clipped so only the top corners stay rounded
-                clipRect(left = gutter, right = size.width) {
-                    data.forEachIndexed { index, _ ->
-                        val barHeight = size.height * barFractions[index].value
-                        if (barHeight <= 0f) return@forEachIndexed
-                        drawRoundRect(
-                            color = if (index == selectedBarIndex) selectedBarColor else barColor,
-                            topLeft = Offset(
-                                x = gutter + slot * index + (slot - barWidth) / 2f,
-                                y = size.height - barHeight
-                            ),
-                            size = Size(barWidth, barHeight + barRadius),
-                            cornerRadius = CornerRadius(barRadius, barRadius)
-                        )
-                    }
+                // Bars: proportional to the chart height, with only the top corners rounded.
+                //
+                // These used to be drawn inside a `clipRect` with a full-height rectangle beneath it,
+                // which relied on the clip to square off the bottom corners. Nothing in that block
+                // appeared on screen. Drawing the shape itself - a rounded-top rectangle that ends
+                // exactly on the baseline - needs no clip at all, so the bar cannot be lost to one.
+                data.forEachIndexed { index, _ ->
+                    val barHeight = size.height * barFractions[index].value
+                    if (barHeight <= 0f) return@forEachIndexed
+                    val left = gutter + slot * index + (slot - barWidth) / 2f
+                    val top = size.height - barHeight
+                    val barRect = RoundRect(
+                        rect = Rect(
+                            left = left,
+                            top = top,
+                            right = left + barWidth,
+                            bottom = size.height
+                        ),
+                        topLeft = CornerRadius(barRadius, barRadius),
+                        topRight = CornerRadius(barRadius, barRadius),
+                        bottomRight = CornerRadius.Zero,
+                        bottomLeft = CornerRadius.Zero
+                    )
+                    drawPath(
+                        path = Path().apply { addRoundRect(barRect) },
+                        color = if (index == selectedBarIndex) selectedBarColor else barColor
+                    )
                 }
             }
 

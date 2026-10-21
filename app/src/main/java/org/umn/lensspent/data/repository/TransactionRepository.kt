@@ -19,6 +19,14 @@ interface TransactionRepository {
     /** Most recent expenses first; [limit] keeps the dashboard query cheap. */
     fun observeTransactions(limit: Int = AllTransactions): Flow<List<Transaction>>
 
+    /**
+     * One expense by id, for the detail screen.
+     *
+     * Emits null when the row does not exist - the detail screen is reachable by a navigation argument
+     * that outlives the row, so "gone" is a state the screen has to render rather than an error.
+     */
+    fun observeTransaction(id: Long): Flow<Transaction?>
+
     fun observeTransactionsBetween(fromMillis: Long, toMillis: Long): Flow<List<Transaction>>
 
     /** Sum of [Transaction.amount] in the half-open range [fromMillis, toMillis). */

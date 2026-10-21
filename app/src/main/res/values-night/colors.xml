@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Kept in step with `background` in LensSpentLightColors / LensSpentDarkColors. -->
+    <color name="lensspent_window_background">#FF080E12</color>
+</resources>

@@ -59,6 +59,12 @@ object ReceiptParser {
         }
 
         // 1. Merchant Extraction
+        // A slip prints the store's name first, above its own date, till number, address and items, so
+        // the whole receipt is scanned and the topmost row that can be a name - one with letters in it,
+        // and none of the furniture a till adds - is the merchant. Ranking the candidates by text size
+        // instead reads an item: [processedRowsOf] welds an item name to the price printed beside it, and
+        // the welded row measures taller than the header above it. Reading order is what the paper
+        // actually printed; the geometry is an artefact of how the photograph was taken.
         val merchantCandidates = processedRows.filter { row ->
             row.text.any { it.isLetter() } &&
             !DateLine.containsMatchIn(row.text) &&
@@ -66,7 +72,7 @@ object ReceiptParser {
             MerchantExclusions.none { exclusion -> row.text.contains(exclusion, ignoreCase = true) } &&
             !TerminalIdRegex.containsMatchIn(row.text)
         }
-        val merchant = merchantCandidates.maxByOrNull { it.height }?.text?.trim() ?: ""
+        val merchant = merchantCandidates.firstOrNull()?.text?.trim() ?: ""
 
         // 2. Bottom-Up Total Extraction
         val explicitKeywords = listOf("TOTAL BELANJA", "TOTAL BAYAR", "GRAND TOTAL", "AMOUNT DUE", "JUMLAH", "TOTAL HARGA")

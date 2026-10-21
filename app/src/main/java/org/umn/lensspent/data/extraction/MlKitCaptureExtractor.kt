@@ -42,9 +42,9 @@ class MlKitCaptureExtractor(
         capture: Capture,
         onStep: (ExtractionStep) -> Unit
     ): ExpenseDraft {
-        // The same steps the sheet is showing are written to logcat, from one place: a receipt that
-        // read badly can then be looked at after the pane is gone, which is the only way to see a
-        // model load on a device nobody is holding.
+        // Every stage is written to logcat from one place, so the tap itself is optional: a receipt
+        // that read badly can be looked at afterwards, which is the only way to see a model load on a
+        // device nobody is holding.
         val report: (ExtractionStep) -> Unit = { step ->
             Log.d(Tag, "${step.stage.label}: ${step.detail}")
             onStep(step)

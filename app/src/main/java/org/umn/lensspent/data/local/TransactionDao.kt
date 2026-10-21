@@ -52,4 +52,13 @@ interface TransactionDao {
 
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    /**
+     * One row, observed.
+     *
+     * Emits null once the row is deleted, which is what lets the detail screen tell "still loading" from
+     * "no longer here" instead of showing a stale copy of an expense the user just removed.
+     */
+    @Query("SELECT * FROM transactions WHERE id = :id")
+    fun observeById(id: Long): Flow<TransactionEntity?>
 }

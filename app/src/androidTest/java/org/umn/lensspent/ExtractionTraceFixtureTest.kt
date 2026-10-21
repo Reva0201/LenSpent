@@ -27,13 +27,13 @@ import org.umn.lensspent.data.model.CaptureStatus
 import org.umn.lensspent.data.repository.OfflineTransactionRepository
 
 /**
- * The debug trace the processing pane renders, produced on a device by the real pipeline.
+ * The steps the pipeline reports while it reads a real image on a device.
  */
 @RunWith(AndroidJUnit4::class)
 class ExtractionTraceFixtureTest {
 
     @Test
-    fun theFastPathStepsReachThePane() = runBlocking {
+    fun theFastPathStepsAreReportedOnDevice() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(context, LensSpentDatabase::class.java).build()
         val repository = OfflineTransactionRepository(

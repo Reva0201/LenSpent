@@ -6,14 +6,12 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.umn.lensspent.data.extraction.CaptureExtractor
-import org.umn.lensspent.data.extraction.ExtractionStep
 import org.umn.lensspent.data.model.CaptureStatus
 import org.umn.lensspent.data.model.Category
 import org.umn.lensspent.data.parseRupiahAmount
@@ -78,36 +76,6 @@ internal fun steppedDate(current: LocalDate, days: Long, today: LocalDate): Loca
     current.isAfter(today) -> current
     else -> minOf(current.plusDays(days), today)
 }
-
-/** How many steps the debug trace keeps: what fits on the processing pane without scrolling. */
-internal const val TraceLineLimit = 8
-
-/**
- * One reported step, stamped with how long after extraction started it arrived.
- *
- * The pipeline carries no clock - it says what happened, and the sheet says when - which is what
- * keeps a slow first run, seconds of weights being unpacked, distinguishable on screen from a
- * receipt that never needed a model at all.
- */
-internal data class ExtractionTraceLine(val elapsedMillis: Long, val step: ExtractionStep)
-
-/**
- * [current] with [step] appended, keeping only the newest [limit] lines.
- *
- * Pure, and shared with its test, because trimming the log is a rule about the pane and not a
- * decision about the receipt - it is pinned down the same way the date stepper's rule is.
- */
-internal fun appendTraceLine(
-    current: List<ExtractionTraceLine>,
-    step: ExtractionStep,
-    elapsedMillis: Long,
-    limit: Int = TraceLineLimit
-): List<ExtractionTraceLine> =
-    (current + ExtractionTraceLine(elapsedMillis, step)).takeLast(limit)
-
-/** Seconds with one decimal, so the fast path reads as 0.0s and a cold model load as 8.3s. */
-internal fun elapsedLabel(elapsedMillis: Long): String =
-    String.format(Locale.US, "%.1fs", elapsedMillis / 1_000.0)
 
 /** The calendar day an instant falls on, in [zone] - the same day the stepper's label shows. */
 internal fun localDateOf(epochMillis: Long, zone: ZoneId): LocalDate =
@@ -200,18 +168,6 @@ class ExpenseReviewViewModel(
      */
     internal val savedExpense: StateFlow<SavedExpense?> = _savedExpense.asStateFlow()
 
-    private val _extractionTrace = MutableStateFlow<List<ExtractionTraceLine>>(emptyList())
-
-    /**
-     * Debug only: every stage the extraction has reported for this capture, oldest first.
-     *
-     * Nothing on the sheet depends on this, and nothing may start to: it is here so a receipt that
-     * takes seconds can be watched instead of guessed at, and so "the model was never woken" is a
-     * fact on screen rather than an absence of one. The pipeline reports from whichever thread a
-     * stage runs on, so this is written from more than one - which a [StateFlow] is built for.
-     */
-    internal val extractionTrace: StateFlow<List<ExtractionTraceLine>> = _extractionTrace.asStateFlow()
-
     private var startedCaptureId: Long? = null
 
     /** Idempotent on purpose: a recomposition or a rotation must not restart the extraction. */
@@ -219,9 +175,7 @@ class ExpenseReviewViewModel(
         if (startedCaptureId == captureId) return
         startedCaptureId = captureId
         _uiState.value = ExpenseReviewUiState.Processing(captureId)
-        _extractionTrace.value = emptyList()
         _savedExpense.value = null
-        val startedAtMillis = clock.millis()
 
         viewModelScope.launch {
             val capture = repository.findCapture(captureId)
@@ -232,12 +186,9 @@ class ExpenseReviewViewModel(
 
             // The extractor records its own output - the OCR text and the model version that produced
             // it - on the capture, so the sheet only has to turn the returned draft into edit state.
-            // Its report is stamped on arrival: the pipeline carries no clock, and how long each
-            // stage took is most of what the debug pane under the spinner is for.
-            val draft = extractor.extract(capture) { step ->
-                _extractionTrace.value =
-                    appendTraceLine(_extractionTrace.value, step, clock.millis() - startedAtMillis)
-            }
+            // Its account of the stages it ran is written to logcat as it goes; nothing on this
+            // screen shows it.
+            val draft = extractor.extract(capture)
 
             val categories = repository.observeCategories().first()
             _uiState.value = ExpenseReviewUiState.Editing(

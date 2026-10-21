@@ -32,6 +32,10 @@ internal class StubTransactionRepository(
 
     override fun observeCategories(): Flow<List<Category>> = unused()
 
+    /** Answered from the same fixed rows, so the detail test sees what the list test sees. */
+    override fun observeTransaction(id: Long): Flow<Transaction?> =
+        flowOf(rows.firstOrNull { it.id == id })
+
     override fun observeTransactionsBetween(fromMillis: Long, toMillis: Long): Flow<List<Transaction>> =
         unused()
 
