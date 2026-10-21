@@ -4,7 +4,9 @@ import android.Manifest
 import android.os.Build
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -121,8 +123,13 @@ fun HomeScreen(
             // hiding one behind a "+" - is worth the strip of screen. Settings moved to the header,
             // which leaves this bar saying one thing.
             Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = Elevation.floating
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                ),
+                // The dock lifts off the scrolling content instead of being a third white block on it.
+                shadowElevation = 8.dp
             ) {
                 Row(
                     modifier = Modifier
@@ -329,6 +336,14 @@ private fun BudgetHero(
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.extraLarge)
             .background(Brush.verticalGradient(listOf(hero.start, hero.end)))
+            // A 1dp white edge at 12%, drawn inside the shape. On a dark card this is what separates
+            // "a filled rectangle" from "a pane of tinted glass": the eye reads a lit top edge and the
+            // card lifts off the page without a drop shadow underneath it.
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.12f),
+                shape = MaterialTheme.shapes.extraLarge
+            )
             .padding(horizontal = Spacing.xxl, vertical = Spacing.xxl)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {

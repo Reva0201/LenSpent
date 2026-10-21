@@ -199,7 +199,8 @@ private fun SettingsCard(content: @Composable () -> Unit) {
         border = BorderStroke(
             width = 1.dp,
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
-        )
+        ),
+        shadowElevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(vertical = Spacing.xs)) {
             content()

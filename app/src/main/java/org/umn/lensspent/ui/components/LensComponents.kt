@@ -108,7 +108,11 @@ fun LensCard(
             modifier = modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surface,
-            border = border
+            border = border,
+            // One soft ambient layer under the hairline. The border defines the edge; the shadow only
+            // suggests that the card is above the paper, which is the difference between "a rectangle
+            // drawn on the page" and "a surface resting on it".
+            shadowElevation = 2.dp
         ) {
             Column(content = content)
         }
@@ -118,7 +122,8 @@ fun LensCard(
             modifier = modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surface,
-            border = border
+            border = border,
+            shadowElevation = 2.dp
         ) {
             Column(content = content)
         }

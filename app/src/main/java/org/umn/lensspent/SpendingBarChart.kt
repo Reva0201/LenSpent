@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.drawText
@@ -173,7 +174,10 @@ fun SpendingBarChart(
                         color = gridColor,
                         start = Offset(gutter, y),
                         end = Offset(size.width, y),
-                        strokeWidth = stroke
+                        strokeWidth = stroke,
+                        // Dashed rather than solid: a solid rule competes with the bars for attention,
+                        // while a dashed one is read as a measuring guide behind them.
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 8f))
                     )
                     axisLabelLayouts.getOrNull(level)?.let { layout ->
                         drawText(layout, topLeft = Offset(0f, y - layout.size.height / 2f))
