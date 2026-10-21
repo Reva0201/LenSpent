@@ -70,31 +70,31 @@ data class HeroColors(
 )
 
 /**
- * A near-black ink card with a teal ring on it, in light mode.
+ * A near-black navy card, in light mode.
  *
- * The first version of this was a primary-to-tertiary diagonal sweep. That is the tell of a designed-by-
- * default app: two brand hues crossing at 45 degrees gives the card no single colour to be, and nothing
- * on it has a stronger edge than the gradient. This pair is deliberately almost flat - the second stop
- * is a few points of lightness away from the first - so the card reads as one dark surface with a
- * single accent, which is what the total needs to sit on.
+ * The first version of this swept from the brand blue into the brand teal, and the two hues crossing at
+ * 45 degrees produced a green that belongs to neither: the card stopped reading as "ink" and started
+ * reading as a colour accident. This pair stays inside one family - deep navy into steel blue - so the
+ * gradient is felt as depth along the card rather than as a second colour. The percentage pill and the
+ * progress line are white, on top, with nothing saturated competing with them.
  */
 internal val LightHeroColors = HeroColors(
-    start = Color(0xFF0B2E3F),
-    end = Color(0xFF0E3D4E),
+    start = Color(0xFF0B2233),
+    end = Color(0xFF17405F),
     content = Color.White,
-    contentMuted = Color.White.copy(alpha = 0.68f),
+    contentMuted = Color.White.copy(alpha = 0.74f),
     accent = Color(0xFF5FD8CB)
 )
 
 /**
- * The same card lifted just above the dark background: dark mode still needs the hero to be a
- * *different* surface from the page, so it is a few points lighter than `background`, not darker.
+ * The same navy family lifted just above the dark background: dark mode still needs the hero to be a
+ * *different* surface from the page, so it is lighter than `background`, not darker.
  */
 internal val DarkHeroColors = HeroColors(
-    start = Color(0xFF101C24),
-    end = Color(0xFF14232C),
+    start = Color(0xFF0E1E2A),
+    end = Color(0xFF16303F),
     content = Color(0xFFE6F1F7),
-    contentMuted = Color(0xFFE6F1F7).copy(alpha = 0.66f),
+    contentMuted = Color(0xFFE6F1F7).copy(alpha = 0.72f),
     accent = Color(0xFF5FD8CB)
 )
 

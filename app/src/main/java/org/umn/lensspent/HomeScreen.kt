@@ -321,46 +321,55 @@ private fun BudgetHero(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.extraLarge)
-            .background(Brush.verticalGradient(listOf(hero.start, hero.end)))
+            .background(Brush.linearGradient(listOf(hero.start, hero.end)))
             .padding(horizontal = Spacing.xxl, vertical = Spacing.xxl)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-            Column {
-                // One label, not three: the month, then the number, then what the number is
-                // measured against.
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = state.monthName,
-                    style = MaterialTheme.typography.labelMedium,
+                    text = "SPENT IN ${state.monthName.uppercase(Locale.getDefault())}",
+                    style = MaterialTheme.typography.labelSmall,
                     color = hero.contentMuted
                 )
-                Spacer(modifier = Modifier.height(Spacing.sm))
-                Text(
-                    text = formatIDR(state.monthTotal),
-                    style = MaterialTheme.typography.displaySmall,
-                    color = hero.content
-                )
                 if (state.hasBudget) {
-                    Spacer(modifier = Modifier.height(Spacing.xs))
-                    Text(
-                        text = "of ${formatIDR(state.monthlyBudget)} budget",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = hero.contentMuted
-                    )
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = hero.content.copy(alpha = 0.18f)
+                    ) {
+                        Text(
+                            text = "${state.budgetUsedPercent}% of budget",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = hero.content,
+                            modifier = Modifier.padding(
+                                horizontal = Spacing.sm,
+                                vertical = Spacing.xs
+                            )
+                        )
+                    }
                 }
             }
 
+            Text(
+                text = formatIDR(state.monthTotal),
+                style = MaterialTheme.typography.displaySmall,
+                color = hero.content
+            )
+
             if (state.hasBudget) {
-                // The bar and the percentage are one object: the line says how far through the
-                // month's money has gone, and the label under it says the same thing in words. The
-                // line is thinner than the default so it reads as a measurement rather than a
-                // control, and the accent colour is the only saturated thing on the card.
+                // White rather than the accent: the line is a measurement of the total above it, and on
+                // a navy card a white line reads as part of the number while a coloured one reads as a
+                // second piece of information.
                 LinearProgressIndicator(
                     progress = { state.budgetUsedFraction },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp),
-                    color = hero.accent,
-                    trackColor = hero.content.copy(alpha = 0.14f),
+                        .height(6.dp),
+                    color = hero.content,
+                    trackColor = hero.content.copy(alpha = 0.24f),
                     strokeCap = StrokeCap.Round,
                     gapSize = 0.dp,
                     drawStopIndicator = {}
@@ -372,14 +381,14 @@ private fun BudgetHero(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${state.budgetUsedPercent}% of budget used",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = hero.accent
-                    )
-                    Text(
                         text = "${formatIDR(state.budgetRemaining)} left",
                         style = MaterialTheme.typography.labelLarge,
                         color = hero.content
+                    )
+                    Text(
+                        text = "of ${formatIDR(state.monthlyBudget)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = hero.contentMuted
                     )
                 }
             } else {
