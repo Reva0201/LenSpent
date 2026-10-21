@@ -1,15 +1,26 @@
 package org.umn.lensspent.ui.components
 
 import android.graphics.Color as AndroidColor
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -17,10 +28,199 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.umn.lensspent.categoryIcon
 import org.umn.lensspent.data.model.Category
+import org.umn.lensspent.ui.theme.Spacing
+
+/**
+ * The app's card.
+ *
+ * A card here is a hairline and a surface colour, not a shadow. Shadows were doing the work that the
+ * layout should do: five cards in a column all casting the same drop shadow reads as five competing
+ * slabs, and on the near-black dark background a shadow is invisible anyway. One outlined surface per
+ * block keeps the page quiet, and the only things that float are the two action bars at the bottom of
+ * the screen.
+ */
+@Composable
+fun LensCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val border = BorderStroke(
+        width = 1.dp,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+    )
+
+    if (onClick == null) {
+        Surface(
+            modifier = modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surface,
+            border = border
+        ) {
+            Column(content = content)
+        }
+    } else {
+        Surface(
+            onClick = onClick,
+            modifier = modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surface,
+            border = border
+        ) {
+            Column(content = content)
+        }
+    }
+}
+
+/**
+ * The category picker, as a row of tiles.
+ *
+ * Chips with a leading icon were the obvious choice and the wrong one: nine chips wrap into three
+ * uneven rows of text, and choosing a category becomes scanning words. A tile row is scanned by shape
+ * and colour - the icon and its tint identify the category before the label is read - and it scrolls
+ * sideways, so adding categories later never reflows the form.
+ *
+ * Selection is a tinted fill plus a border in the category's own colour, which is the same colour the
+ * category has everywhere else in the app.
+ */
+@Composable
+fun CategoryTilePicker(
+    categories: List<Category>,
+    selectedId: Long?,
+    onSelect: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+    ) {
+        items(categories, key = { it.id }) { category ->
+            val selected = category.id == selectedId
+            val tint = categoryTint(category.colorHex)
+
+            Column(
+                modifier = Modifier
+                    .width(78.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(
+                        if (selected) {
+                            tint.copy(alpha = 0.14f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        }
+                    )
+                    .then(
+                        if (selected) {
+                            Modifier.border(1.5.dp, tint, MaterialTheme.shapes.medium)
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .clickable { onSelect(category.id) }
+                    .padding(vertical = Spacing.md, horizontal = Spacing.xs),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(tint.copy(alpha = if (selected) 0.28f else 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = categoryIcon(category.iconKey),
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Text(
+                    text = category.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (selected) tint else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A category's share of a total, as a labelled bar.
+ *
+ * Ranking answers "where did my money go" faster than any chart: the eye reads the order and the
+ * lengths, and the amount is right there when it wants the number.
+ */
+@Composable
+fun CategoryShareRow(
+    category: Category,
+    amount: Long,
+    share: Float,
+    formattedAmount: String,
+    modifier: Modifier = Modifier
+) {
+    val tint = categoryTint(category.colorHex)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CategoryBadge(category = category, size = 36.dp)
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = category.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = formattedAmount,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction = share.coerceIn(0f, 1f))
+                        .height(6.dp)
+                        .clip(MaterialTheme.shapes.extraSmall)
+                        .background(tint)
+                )
+            }
+
+            Text(
+                text = "${(share * 100).toInt()}% of this month",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
 /**
  * The category's own colour, from the hex the taxonomy stores.

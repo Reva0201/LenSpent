@@ -26,8 +26,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -62,6 +60,7 @@ import java.util.Locale
 import org.umn.lensspent.data.SpendingAggregator
 import org.umn.lensspent.data.model.Transaction
 import org.umn.lensspent.ui.components.CategoryBadge
+import org.umn.lensspent.ui.components.LensCard
 import org.umn.lensspent.ui.components.SectionHeader
 import org.umn.lensspent.ui.theme.Elevation
 import org.umn.lensspent.ui.theme.LocalHeroColors
@@ -476,12 +475,7 @@ private fun SpendingOverviewCard(
     weekDailyAverage: Float,
     onOpenAnalytics: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = Elevation.card
-    ) {
+    LensCard {
         Column(
             modifier = Modifier.padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
@@ -529,13 +523,7 @@ private fun SpendingOverviewCard(
 @Composable
 private fun AiInsightsCard(onClick: () -> Unit) {
     val hero = LocalHeroColors.current
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = Elevation.raised
-    ) {
+    LensCard(onClick = onClick) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -614,12 +602,7 @@ private fun RecentTransactionsCard(
     transactions: List<Transaction>,
     onOpenTransaction: (Long) -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = Elevation.raised
-    ) {
+    LensCard {
         Column {
             transactions.forEachIndexed { index, transaction ->
                 if (index > 0) {
@@ -685,14 +668,7 @@ private fun TransactionRow(
 
 @Composable
 private fun EmptyLedgerCard(onNavigateToCamera: () -> Unit) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = Elevation.raised),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
-    ) {
+    LensCard {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

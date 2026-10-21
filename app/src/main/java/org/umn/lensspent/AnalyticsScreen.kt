@@ -50,8 +50,10 @@ import org.umn.lensspent.data.DaySummary
 import org.umn.lensspent.data.SpendingAggregator
 import org.umn.lensspent.data.model.Transaction
 import org.umn.lensspent.ui.components.CategoryBadge
+import org.umn.lensspent.ui.components.CategoryShareRow
+import org.umn.lensspent.ui.theme.Spacing
 
-private val AnalyticsTabs = listOf("Daily", "Weekly", "Yearly")
+private val AnalyticsTabs = listOf("Daily", "Weekly", "Yearly", "Categories")
 
 private const val HistoryTitle = "History Spending"
 
@@ -61,7 +63,12 @@ private fun weekRangeLabel(weekStart: LocalDate): String =
 
 /** Screen-level layout tokens; shapes, colours and typography come from Material 3. */
 private object AnalyticsDimens {
-    val PagerHeight = 280.dp
+    /**
+     * The compartment height. It was 280dp, sized for the daily summary; the category breakdown needs a
+     * little more room, and the daily tab has slack, so the whole pager grew rather than the sheet
+     * shrinking on one tab only.
+     */
+    val PagerHeight = 336.dp
     val Gutter = 16.dp
     val VerticalGap = 8.dp
     val SheetCorner = 32.dp
@@ -139,9 +146,14 @@ fun AnalyticsScreen(
                             }
                         },
                         text = {
+                            // One line, never wrapped: four tabs on a phone leave about 80dp each, and
+                            // "Categories" at body size broke onto two lines and pushed the indicator
+                            // off the tab row.
                             Text(
                                 text = title,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     )
@@ -171,16 +183,72 @@ fun AnalyticsScreen(
                         )
                     }
 
-                    else -> ChartPage(
+                    2 -> ChartPage(
                         data = uiState.yearSeries,
                         labels = SpendingAggregator.monthlyLabels
                     ) {
                         LabelHeader(text = "${uiState.year} Overview")
                     }
+
+                    else -> CategoryPage(state = uiState)
+                }
+            }            
+            TransactionHistorySheet(transactions = uiState.history)
+        }
+    }
+}
+
+/**
+ * The fourth compartment: where the month's money actually went.
+ *
+ * The three tabs before this one answer "when"; none of them answer "what on", which is the question a
+ * spending app exists for. Ranked bars rather than a donut: nine categories are easier to compare as
+ * lengths than as arcs, and each row can carry its own amount without a legend.
+ */
+@Composable
+private fun CategoryPage(state: AnalyticsUiState) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(
+                horizontal = AnalyticsDimens.Gutter,
+                vertical = AnalyticsDimens.VerticalGap
+            ),
+        verticalArrangement = Arrangement.spacedBy(AnalyticsDimens.VerticalGap)
+    ) {
+        Column {
+            Text(
+                text = "By category",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "${state.monthName} · ${formatIDR(state.monthTotal)} spent",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (state.categoryTotals.isEmpty()) {
+            Text(
+                text = "No spending recorded this month yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
+                items(state.categoryTotals, key = { it.category.id }) { total ->
+                    CategoryShareRow(
+                        category = total.category,
+                        amount = total.amount,
+                        share = total.share,
+                        formattedAmount = formatIDR(total.amount)
+                    )
                 }
             }
-            
-            TransactionHistorySheet(transactions = uiState.history)
         }
     }
 }
@@ -191,8 +259,7 @@ private fun ChartPage(
     data: List<Float>,
     labels: List<String>,
     header: @Composable () -> Unit
-) {
-    Column(
+) {    Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(

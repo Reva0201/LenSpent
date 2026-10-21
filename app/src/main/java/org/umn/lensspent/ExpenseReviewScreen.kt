@@ -6,8 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,8 +28,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +61,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.umn.lensspent.data.model.Category
+import org.umn.lensspent.ui.components.CategoryTilePicker
 import org.umn.lensspent.ui.theme.Elevation
 import org.umn.lensspent.ui.theme.Sizes
 import org.umn.lensspent.ui.theme.Spacing
@@ -447,8 +444,7 @@ private fun CapturePreview(preview: ImageBitmap?) {
     }
 }
 
-/** The taxonomy as wrapping chips, the same control the manual form uses for the same choice. */
-@OptIn(ExperimentalLayoutApi::class)
+/** The taxonomy as the same tile row the manual form uses for the same choice. */
 @Composable
 private fun CategoryPicker(
     categories: List<Category>,
@@ -461,35 +457,10 @@ private fun CategoryPicker(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
-        ) {
-            categories.forEach { category ->
-                FilterChip(
-                    selected = category.id == selectedCategoryId,
-                    onClick = { onSelect(category.id) },
-                    label = {
-                        Text(
-                            text = category.name,
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = categoryIcon(category.iconKey),
-                            contentDescription = null,
-                            modifier = Modifier.size(Sizes.iconSmall)
-                        )
-                    },
-                    shape = MaterialTheme.shapes.small,
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
-            }
-        }
+        CategoryTilePicker(
+            categories = categories,
+            selectedId = selectedCategoryId,
+            onSelect = onSelect
+        )
     }
 }

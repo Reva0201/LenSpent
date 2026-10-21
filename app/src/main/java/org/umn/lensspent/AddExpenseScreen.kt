@@ -2,8 +2,6 @@ package org.umn.lensspent
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,8 +22,6 @@ import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.umn.lensspent.data.model.Category
+import org.umn.lensspent.ui.components.CategoryTilePicker
 import org.umn.lensspent.ui.theme.Elevation
 import org.umn.lensspent.ui.theme.Sizes
 import org.umn.lensspent.ui.theme.Spacing
@@ -68,7 +65,7 @@ import org.umn.lensspent.ui.theme.Spacing
  * Save is disabled until the form is valid, and a line under it says what is missing, so a blocked
  * button explains itself instead of just being dead.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseScreen(
     onBack: () -> Unit,
@@ -313,50 +310,13 @@ private fun CategoryPicker(
             }
         }
 
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
-        ) {
-            uiState.categories.forEach { category ->
-                CategoryChip(
-                    category = category,
-                    selected = category.id == uiState.selectedCategoryId,
-                    onClick = { onCategorySelected(category.id) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CategoryChip(
-    category: Category,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = {
-            Text(
-                text = category.name,
-                style = MaterialTheme.typography.labelLarge
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = categoryIcon(category.iconKey),
-                contentDescription = null,
-                modifier = Modifier.size(Sizes.iconSmall)
-            )
-        },
-        shape = MaterialTheme.shapes.small,
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+        CategoryTilePicker(
+            categories = uiState.categories,
+            selectedId = uiState.selectedCategoryId,
+            onSelect = onCategorySelected,
+            modifier = Modifier.padding(top = Spacing.sm)
         )
-    )
+    }
 }
 
 /** The same stepper the review sheet uses, so the two dates are read and stepped identically. */
