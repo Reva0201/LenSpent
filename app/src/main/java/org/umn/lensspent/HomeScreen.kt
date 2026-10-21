@@ -2,6 +2,8 @@ package org.umn.lensspent
 
 import android.Manifest
 import android.os.Build
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +62,7 @@ import java.util.Locale
 import org.umn.lensspent.data.SpendingAggregator
 import org.umn.lensspent.data.model.Transaction
 import org.umn.lensspent.ui.components.CategoryBadge
+import org.umn.lensspent.ui.components.CountUpAmount
 import org.umn.lensspent.ui.components.LensCard
 import org.umn.lensspent.ui.components.SectionHeader
 import org.umn.lensspent.ui.theme.Elevation
@@ -315,6 +318,11 @@ private fun BudgetHero(
     onSetBudget: () -> Unit
 ) {
     val hero = LocalHeroColors.current
+    val animatedFraction by animateFloatAsState(
+        targetValue = state.budgetUsedFraction,
+        animationSpec = tween(durationMillis = 700),
+        label = "budget-used-fraction"
+    )
 
     Box(
         modifier = Modifier
@@ -352,8 +360,8 @@ private fun BudgetHero(
                 }
             }
 
-            Text(
-                text = formatIDR(state.monthTotal),
+            CountUpAmount(
+                amount = state.monthTotal,
                 style = MaterialTheme.typography.displaySmall,
                 color = hero.content
             )
@@ -363,7 +371,7 @@ private fun BudgetHero(
                 // a navy card a white line reads as part of the number while a coloured one reads as a
                 // second piece of information.
                 LinearProgressIndicator(
-                    progress = { state.budgetUsedFraction },
+                    progress = { animatedFraction },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp),

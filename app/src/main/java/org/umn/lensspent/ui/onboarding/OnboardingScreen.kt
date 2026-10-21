@@ -1,5 +1,11 @@
 package org.umn.lensspent.ui.onboarding
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -98,17 +104,32 @@ fun OnboardingScreen(
                 // the keyboard rather than hide behind it.
                 .imePadding()
         ) {
-            when (uiState.step) {
-                OnboardingStep.Agreement -> AgreementPage(onAgree = viewModel::onAgree)
-                OnboardingStep.Profile -> ProfilePage(
-                    username = uiState.username,
-                    onUsernameChange = viewModel::onUsernameChange,
-                    budgetText = uiState.budgetText,
-                    monthlyBudgetIdr = uiState.monthlyBudgetIdr,
-                    onBudgetChange = viewModel::onBudgetChange,
-                    onBack = viewModel::onBackToAgreement,
-                    onStartTracking = viewModel::startTracking
-                )
+            AnimatedContent(
+                targetState = uiState.step,
+                transitionSpec = {
+                    // Page-turn rather than a cut: the incoming page slides in from the direction the
+                    // flow is heading and the outgoing one fades underneath it. Both directions animate,
+                    // so going Back does not feel like a different app from going forward.
+                    val direction = if (targetState == OnboardingStep.Profile) 1 else -1
+                    (
+                        fadeIn(animationSpec = tween(240)) +
+                            slideInHorizontally(animationSpec = tween(240)) { it / 8 * direction }
+                        ) togetherWith fadeOut(animationSpec = tween(160))
+                },
+                label = "onboarding-step"
+            ) { step ->
+                when (step) {
+                    OnboardingStep.Agreement -> AgreementPage(onAgree = viewModel::onAgree)
+                    OnboardingStep.Profile -> ProfilePage(
+                        username = uiState.username,
+                        onUsernameChange = viewModel::onUsernameChange,
+                        budgetText = uiState.budgetText,
+                        monthlyBudgetIdr = uiState.monthlyBudgetIdr,
+                        onBudgetChange = viewModel::onBudgetChange,
+                        onBack = viewModel::onBackToAgreement,
+                        onStartTracking = viewModel::startTracking
+                    )
+                }
             }
         }
     }

@@ -1,6 +1,10 @@
 package org.umn.lensspent.ui.components
 
 import android.graphics.Color as AndroidColor
+import android.animation.ValueAnimator
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,17 +27,61 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.umn.lensspent.categoryIcon
 import org.umn.lensspent.data.model.Category
+import org.umn.lensspent.formatIDR
 import org.umn.lensspent.ui.theme.Spacing
+
+/**
+ * A Rupiah amount that counts up to its value.
+ *
+ * Two movements in one: the first frame after a screen opens counts up from zero, which gives the eye
+ * something to follow and makes the number feel like it arrived rather than appeared; and a later change
+ * - saving an expense, setting a budget - animates from the old value to the new one, so the difference
+ * is visible instead of being a number that silently became another number.
+ *
+ * The animation is skipped outright when the system's animator scale is zero. That setting is an
+ * accessibility choice ("remove animations"), not a preference, and a counting number is exactly the
+ * kind of motion it exists to stop.
+ */
+@Composable
+fun CountUpAmount(
+    amount: Long,
+    style: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+    durationMillis: Int = 700
+) {
+    val animated = remember { Animatable(0f) }
+    val animationsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+
+    LaunchedEffect(amount) {
+        animated.animateTo(
+            targetValue = amount.toFloat(),
+            animationSpec = tween(
+                durationMillis = if (animationsEnabled) durationMillis else 0,
+                easing = FastOutSlowInEasing
+            )
+        )
+    }
+
+    Text(
+        text = formatIDR(animated.value.toLong()),
+        style = style,
+        color = color,
+        modifier = modifier
+    )
+}
 
 /**
  * The app's card.
@@ -167,6 +215,17 @@ fun CategoryShareRow(
     modifier: Modifier = Modifier
 ) {
     val tint = categoryTint(category.colorHex)
+    val animatedShare = remember { Animatable(0f) }
+
+    // Grows from nothing on first show, so the ranking is read as lengths changing rather than as a
+    // finished bar chart that was always there.
+    LaunchedEffect(share) {
+        animatedShare.animateTo(
+            targetValue = share.coerceIn(0f, 1f),
+            animationSpec = tween(durationMillis = 600, delayMillis = 80, easing = FastOutSlowInEasing)
+        )
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -206,7 +265,7 @@ fun CategoryShareRow(
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(fraction = share.coerceIn(0f, 1f))
+                        .fillMaxWidth(fraction = animatedShare.value)
                         .height(6.dp)
                         .clip(MaterialTheme.shapes.extraSmall)
                         .background(tint)

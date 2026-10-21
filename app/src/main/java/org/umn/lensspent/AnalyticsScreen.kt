@@ -484,7 +484,10 @@ private fun TransactionHistorySheet(transactions: List<Transaction>) {
                     }
                 }
                 items(transactions, key = { it.id }) { txn ->
-                    TransactionRow(txn)
+                    TransactionRow(
+                        txn = txn,
+                        modifier = Modifier.animateItem()
+                    )
                 }
             }
         }
@@ -493,9 +496,9 @@ private fun TransactionHistorySheet(transactions: List<Transaction>) {
 
 /** Single transaction card: the same category badge the dashboard uses, then the Rupiah amount. */
 @Composable
-private fun TransactionRow(txn: Transaction) {
+private fun TransactionRow(txn: Transaction, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surface)
