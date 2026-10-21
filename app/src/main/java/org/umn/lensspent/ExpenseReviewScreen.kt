@@ -1,6 +1,12 @@
 package org.umn.lensspent
 
 import android.net.Uri
+import android.animation.ValueAnimator
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,15 +22,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,8 +51,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -55,10 +68,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.umn.lensspent.data.model.Category
 import org.umn.lensspent.ui.components.CategoryTilePicker
@@ -159,40 +176,177 @@ fun ExpenseReviewScreen(
  */
 @Composable
 internal fun SaveConfirmationDialog(saved: SavedExpense, onDismiss: () -> Unit) {
-    AlertDialog(
-        // Back, or a tap outside, has read the confirmation just as surely as the button has
+    Dialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
+        // The card sizes itself: the platform's default dialog width would leave a narrow column of
+        // text in the middle of a wide phone.
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        val cardScale = remember { Animatable(0.9f) }
+        val contentAlpha = remember { Animatable(0f) }
+        val tickProgress = remember { Animatable(0f) }
+        val animationsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+
+        LaunchedEffect(Unit) {
+            if (!animationsEnabled) {
+                cardScale.snapTo(1f)
+                contentAlpha.snapTo(1f)
+                tickProgress.snapTo(1f)
+                return@LaunchedEffect
+            }
+            // The card arrives first and overshoots very slightly, so it reads as landing rather than
+            // fading in. The tick then draws over a third of a second - the pause between the card
+            // settling and the tick finishing is what makes the moment feel deliberate instead of
+            // instant.
+            cardScale.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(dampingRatio = 0.62f, stiffness = 420f)
             )
-        },
-        title = { Text(text = "Expense saved", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "${saved.merchant} - ${formatIDR(saved.amountRupiah)}",
-                    fontWeight = FontWeight.Bold
+            launch { contentAlpha.animateTo(1f, tween(SaveContentFadeMillis)) }
+            tickProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = SaveTickDrawMillis,
+                    delayMillis = SaveTickDelayMillis,
+                    easing = FastOutSlowInEasing
                 )
-                Text(
-                    text = saved.categoryName?.let { "Added to $it spending." }
-                        ?: "Saved without a category name."
+            )
+        }
+
+        Surface(
+            modifier = Modifier
+                .padding(horizontal = Spacing.xxxl)
+                .graphicsLayer {
+                    scaleX = cardScale.value
+                    scaleY = cardScale.value
+                },
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 12.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(Spacing.xxl),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                SavedCheck(progress = { tickProgress.value })
+
+                Spacer(modifier = Modifier.height(Spacing.sm))
+
+                Column(
+                    modifier = Modifier.alpha(contentAlpha.value),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    Text(
+                        text = "Expense saved",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "${saved.merchant} - ${formatIDR(saved.amountRupiah)}",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = saved.categoryName?.let { "Added to $it spending." }
+                            ?: "Saved without a category name.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = dayLabel(saved.date),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "It's in your recent transactions now.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(Spacing.sm))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Text(
+                        text = "Done",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The tick, drawn rather than shown.
+ *
+ * A check mark that appears already finished is a picture of a tick; one that draws itself is the app
+ * confirming something. Two layers: a translucent halo that gives the mark weight against the card, and
+ * the tick stroked along a measured path so it grows from the first point to the last.
+ */
+@Composable
+private fun SavedCheck(progress: () -> Float) {
+    Box(
+        modifier = Modifier.size(76.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(76.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+        )
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(28.dp)) {
+                val tick = Path().apply {
+                    moveTo(size.width * 0.14f, size.height * 0.54f)
+                    lineTo(size.width * 0.41f, size.height * 0.80f)
+                    lineTo(size.width * 0.88f, size.height * 0.22f)
+                }
+                val measure = PathMeasure().apply { setPath(tick, false) }
+                val drawn = Path()
+                measure.getSegment(
+                    startDistance = 0f,
+                    stopDistance = measure.length * progress().coerceIn(0f, 1f),
+                    destination = drawn,
+                    startWithMoveTo = true
                 )
-                Text(text = dayLabel(saved.date))
-                Text(
-                    text = "It's in your recent transactions now.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                drawPath(
+                    path = drawn,
+                    color = Color.White,
+                    style = Stroke(
+                        width = 3.dp.toPx(),
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round
+                    )
                 )
             }
-        },
-        confirmButton = {
-            Button(onClick = onDismiss) { Text(text = "Done") }
         }
-    )
+    }
 }
+
+private const val SaveContentFadeMillis = 220
+private const val SaveTickDrawMillis = 340
+private const val SaveTickDelayMillis = 140
 
 /**
  * First stage: the brief on-device work that happens before anything is editable.
