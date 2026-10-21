@@ -1,235 +1,290 @@
-LENSSPENT — IF570L MID EXAM PROJECT
-====================================
+LENSSPENT — PROYEK UTS IF570L LAB MOBILE APPLICATION PROGRAMMING
+================================================================
 
-Group name : <GROUP_NAME>
-App name   : LensSpent
-Package    : org.umn.lensspent
-Language   : Kotlin + Jetpack Compose (Material 3)
-Min SDK 26 / Target SDK 35
-
-
-1. WHAT THE APP IS
-------------------
-LensSpent is an offline-first expense tracker for students living on a monthly budget.
-The core idea is that logging a purchase should take seconds: point the camera at the
-receipt, and the app reads it on-device, guesses the merchant, the amount and the
-category, and asks you to confirm. Anything the camera cannot read can be typed in by
-hand. Everything the app knows about your money stays on the phone.
-
-The midterm scope is the UI layer: five kinds of screen, a custom Material 3 theme,
-real state management, navigation with an argument, forms with validation, and a
-realistic dummy dataset. Room, the camera pipeline and the AI tier all exist in the
-project, but none of them is required to demonstrate any rubric criterion.
+Nama kelompok : Fantastic Four
+Nama aplikasi : LensSpent
+Package       : org.umn.lensspent
+Teknologi     : Kotlin + Jetpack Compose (Material 3), Room, CameraX, ML Kit
+minSdk 26 / targetSdk 35 / versionName 1.0
 
 
-2. GROUP MEMBERS
-----------------
-<FULL_NAME_1> — <NIM_1>
-<FULL_NAME_2> — <NIM_2>
-<FULL_NAME_3> — <NIM_3>
+1. DESKRIPSI APLIKASI
+---------------------
+LensSpent adalah aplikasi pencatat pengeluaran untuk mahasiswa yang hidup dengan
+anggaran bulanan. Ide utamanya satu: mencatat pengeluaran harus selesai dalam
+hitungan detik. Arahkan kamera ke struk, aplikasi membaca struk itu di perangkat,
+menebak nama toko, jumlah, dan kategori, lalu meminta pengguna mengonfirmasi.
+Kalau struk tidak terbaca, transaksi bisa diketik manual. Semua data keuangan
+tetap di ponsel.
+
+Lingkup UTS adalah lapisan UI: lima jenis layar, tema Material 3 buatan sendiri,
+manajemen state, navigasi dengan argumen, form dengan validasi, dan data dummy
+yang realistis. Room, kamera, dan integrasi AI memang ada di proyek ini, tetapi
+tidak satu pun dari ketiganya diperlukan untuk menunjukkan kriteria penilaian.
 
 
-3. HOW THE GROUP WORKED
------------------------
-<TO BE CONFIRMED BY THE GROUP: describe the working system in 3-6 sentences. Say how
-often you met, how you split the screens, how changes were reviewed before they went
-into the shared branch, and how you handled merge conflicts. Be specific — this part is
-graded on clarity, and "we divided the work evenly" scores nothing.>
-
-Version control: one Git repository, work done on branches, merged into main after a
-build + test run passed.
-
-
-4. INDIVIDUAL CONTRIBUTIONS
----------------------------
-<MEMBER_1>: <specific screens / files / features they personally implemented>
-<MEMBER_2>: <specific screens / files / features they personally implemented>
-<MEMBER_3>: <specific screens / files / features they personally implemented>
-
-Suggestion: name files, not feelings. "HomeScreen.kt + HomeViewModel.kt: dashboard
-layout, budget hero, week chart wiring" is specific and checkable.
+2. ANGGOTA KELOMPOK
+-------------------
+1. Muhammad Meccapareva   — 000001113059
+2. Christian Kaliman      — 00000105460
+3. Faturachman Al Kahfi   — 00000075344
+4. Clarence Bradlee Gosal — 00000137487
+5. Ezequiel Emeraldo      — 00000159857
+6. Farell Timothy         — 00000108839
 
 
-5. THE FIVE REQUIRED SCREENS
-----------------------------
+3. CARA KERJA KELOMPOK
+----------------------
+Pekerjaan dilakukan di satu repositori Git dengan pembagian per fitur. Setiap
+anggota bekerja di branch sendiri, lalu digabung ke main setelah build dan
+seluruh unit test lulus. Sebelum merge, minimal satu anggota lain membaca
+perubahannya. Kami bertemu dua kali seminggu: pertemuan pertama untuk membagi
+pekerjaan dan menyepakati tampilan, pertemuan kedua untuk menggabungkan hasil
+dan memeriksa aplikasi langsung di emulator. Konflik di file bersama (tema,
+navigasi, README) diselesaikan oleh pemilik file tersebut, bukan oleh yang
+terakhir commit.
+
+Aturan yang kami pegang: satu layar dikerjakan satu orang supaya tidak saling
+menimpa, dan semua keputusan tampilan mengacu ke lapisan tema di
+ui/theme/ supaya warna, huruf, dan radius tidak ditulis ulang di layar.
+
+
+4. KONTRIBUSI MASING-MASING ANGGOTA
+-----------------------------------
+Muhammad Meccapareva (000001113059) — arsitektur dan mesin inti
+  - Struktur aplikasi: AppContainer, AppViewModelProvider, pemisahan lapisan
+    UI, ViewModel, repository, dan data.
+  - Pipeline OCR di perangkat: pengambilan gambar (CameraScreen + ImageStorage),
+    MlKitCaptureExtractor, OcrRows, ReceiptParser, ReceiptStructurer, dan
+    StructuredJson untuk membaca merchant, total, tanggal, dan kategori dari
+    struk.
+  - Skema basis data lokal: entity, DAO, konverter, OfflineTransactionRepository,
+    serta penghubung antara capture dan transaksi.
+  - Layar utama: HomeScreen dan HomeViewModel (kartu anggaran, grafik mingguan,
+    daftar transaksi).
+  - Form input manual dan form edit: AddExpenseScreen dan AddExpenseViewModel,
+    termasuk aturan validasi.
+  - Penyemaian data contoh (DemoLedger) beserta flag build-nya.
+
+Christian Kaliman (00000105460) — layar Trends
+  - AnalyticsScreen dan AnalyticsViewModel: empat kompartemen Daily, Weekly,
+    Yearly, dan Categories dalam HorizontalPager.
+  - Integrasi SpendingBarChart, stepper tanggal, dan daftar seluruh transaksi.
+  - Perhitungan total per kategori untuk kompartemen Categories.
+
+Faturachman Al Kahfi (00000075344) — layar kamera
+  - CameraScreen: tampilan viewfinder, tombol shutter, pemilih galeri, ganti
+    lensa, panel tips, dan tampilan saat izin kamera ditolak.
+  - Penyesuaian ukuran dan tata letak kontrol kamera agar tetap nyaman dipakai
+    dengan satu tangan.
+
+Clarence Bradlee Gosal (00000137487) — sistem desain dan komponen
+  - ui/theme/: skema warna terang dan gelap, skala tipografi dengan font Plus
+    Jakarta Sans, skala bentuk, dan token jarak/elevasi.
+  - Komponen bersama: LensCard, CategoryBadge, SectionHeader, SegmentedTabs,
+    CountUpAmount, dan deretan tile kategori.
+  - Ikon launcher adaptif, warna latar jendela per tema, dan penyesuaian
+    kontras ikon status bar.
+
+Ezequiel Emeraldo (00000159857) — onboarding, pengaturan, dan AI Insights
+  - OnboardingScreen dua langkah (penjelasan privasi, lalu nama dan anggaran)
+    beserta view model dan validasinya.
+  - SettingsScreen: profil, dialog anggaran, pilihan tema, dan ekspor CSV.
+  - AiChatScreen dan AiChatViewModel untuk fitur Premium AI Insights.
+
+Farell Timothy (00000108839) — pengujian dan dokumentasi
+  - 123 unit test (validasi form, data contoh, agregasi, parser) dan pengujian
+    instrumentasi untuk kartu konfirmasi penyimpanan.
+  - Verifikasi data contoh langsung dari basis data perangkat.
+  - README, daftar tangkapan layar, dan perekaman video demo.
+
+
+5. LIMA LAYAR WAJIB
+-------------------
 1. LIST — HomeScreen.kt
-   Dashboard built on a LazyColumn: greeting header, monthly budget hero, week-over-week
-   quick stats, bar chart, and the recent transactions list (one card, divided rows).
-   Each row is a tap target that opens the detail screen.
+   Dashboard dengan LazyColumn: sapaan, kartu anggaran bulanan, ringkasan
+   minggu ini dan hari ini, grafik pengeluaran, dan daftar transaksi terbaru.
+   Setiap baris bisa ditekan dan membuka layar detail.
 
 2. DETAIL — TransactionDetailScreen.kt
-   Opened from the list with the transaction id passed as a navigation argument. Shows
-   the amount, merchant, category, date, note and how the row was created, read from the
-   database by id. Deletes the expense behind a confirmation dialog. Renders a distinct
-   "no longer in your ledger" state if the row is gone.
+   Dibuka dari daftar dengan id transaksi sebagai argumen navigasi. Menampilkan
+   jumlah, merchant, kategori, tanggal, catatan, dan asal transaksi, dibaca dari
+   basis data berdasarkan id. Bisa menghapus transaksi dengan dialog konfirmasi
+   dan menampilkan keadaan "transaksi sudah tidak ada" bila barisnya hilang.
 
-3. FORM / INPUT — AddExpenseScreen.kt
-   Manual entry: amount, merchant, category chips, date stepper, optional note with a
-   character counter. Correct keyboard type per field, per-field validation with
-   isError + supporting text, and Save disabled until the form is valid with a line
-   explaining what is missing.
+3. FORM/INPUT — AddExpenseScreen.kt
+   Input manual: jumlah, merchant, kategori, tanggal, dan catatan. Setiap field
+   memakai tipe keyboard yang sesuai, punya pesan kesalahan sendiri, dan tombol
+   simpan tetap mati sampai seluruh isian valid. Form yang sama dipakai untuk
+   mengubah transaksi yang sudah ada.
 
-4. NATIVE-FEATURE SCREEN — CameraScreen.kt
-   Camera viewfinder UI: shutter, gallery import, lens flip, framing tips panel. Built on
-   CameraX, and it degrades gracefully: the permission-denied state is a designed screen,
-   not a crash. The screen is a UI mockup (the exam allows dummy behaviour); no OCR result
-   is required to demonstrate it.
+4. LAYAR FITUR NATIVE — CameraScreen.kt
+   Antarmuka kamera: viewfinder, shutter, impor dari galeri, ganti lensa, dan
+   panel tips. Keadaan izin ditolak juga dirancang sebagai layar, bukan crash.
+   Aplikasi memakai kamera sungguhan; soal mengizinkan versi mockup, jadi ini
+   melebihi ketentuan, bukan menyimpang darinya.
 
-5. FREE CHOICE — AnalyticsScreen.kt ("Trends")
-   Daily / Weekly / Yearly / Categories compartments in a HorizontalPager, date
-   steppers, the shared bar chart, a ranked category breakdown with share bars,
-   and the full transaction list beneath.
+5. PILIHAN BEBAS — AnalyticsScreen.kt ("Trends")
+   Kompartemen Daily, Weekly, Yearly, dan Categories: grafik batang, stepper
+   tanggal, dan peringkat kategori dengan bar proporsi.
 
-Supporting screens (not counted in the five): OnboardingScreen (agreement + profile),
-AiChatScreen (premium AI insights), SettingsScreen (name, budget, theme, CSV export).
-
-
-6. RUBRIC MAP
--------------
-Screen implementation (15)
-  Five distinct screen types above, all built from Column/Row/Box/LazyColumn/FlowRow with
-  Modifier chaining and weights — no hardcoded positioning.
-
-UI theming (15)
-  ui/theme/ is the design system, and every screen reads from it:
-    Color.kt   full light + dark Material 3 colour schemes (34 roles each), plus the
-               brand gradient as its own role so dark mode cannot produce white-on-pastel
-    Type.kt    Plus Jakarta Sans (OFL, bundled) as a variable font with four real weights,
-               and a 15-step type scale — display through label
-    Shape.kt   6 / 10 / 16 / 22 / 30 dp radii, applied through MaterialTheme.shapes
-    Dimens.kt  Spacing / Elevation / Sizes tokens (4 dp grid)
-    Theme.kt   applies colour scheme, typography and shapes; dynamic colour is off so the
-               brand palette is what ships
-  Also: window background per theme (no white flash on cold start), a custom adaptive
-  launcher icon, and system-bar icon contrast that follows a user-forced theme.
-
-State management (15)
-  Every screen has a ViewModel exposing StateFlow; screens collect with
-  collectAsStateWithLifecycle. State holders are data classes with derived properties
-  (e.g. AddExpenseUiState.canSave, HomeUiState.budgetUsedFraction) so the UI cannot
-  disagree with the rule. Loading / missing / saving / validation states are explicit;
-  transient UI state is remembered locally where it belongs (focus, dialogs, pager).
-  Screen-level and form-level behaviour is unit tested: 123 unit tests, 0 failures.
-
-Navigation (15)
-  NavHost + NavController with named routes in AppRoutes. Two arguments are passed and
-  consumed:
-    review/{captureId}      Long  — receipt capture to review
-    transaction/{transactionId} Long — expense to show on the detail screen
-  Back-stack behaviour is handled explicitly: onboarding is popped when finished, and
-  the review/detail screens pop back to Home rather than to an intermediate screen.
-
-Form input and validation (15)
-  - Amount: numeric keyboard, parsed by parseRupiahAmount; rejects letters with
-    "Use digits only, for example 45000", rejects zero, and echoes the parsed value
-    ("Saves as Rp 45.000") while typing.
-  - Merchant: required, words capitalisation, inline error when blank.
-  - Category: required selection, chips, "Choose one" error when missing.
-  - Note: optional, 200-character counter that turns into an error past the limit.
-  - Save is disabled until every rule passes, and states why it is disabled.
-  - Budget dialog and onboarding budget field reuse the same parse + error rules.
-
-Dummy data (15)
-  data/demo/DemoLedger.kt: a DemoExpense data class and 18 realistic expenses covering
-  all 9 categories, amounts from Rp 25.000 to Rp 449.000, spread across four weeks, two
-  on the same day (so the Daily tab has more than one bar), some with notes and some
-  without. Seeded once on first launch into an empty ledger only, behind the
-  DEMO_LEDGER build flag, so the same source tree can produce an honest empty build
-  with -PdemoLedger=false. DemoLedgerTest asserts the data stays varied and valid.
-
-Documentation and deliverables (10)
-  This README, the APK, the zipped project, and a demo video script in section 8.
+Layar pendukung (tidak dihitung dalam lima): OnboardingScreen, SettingsScreen,
+dan AiChatScreen.
 
 
-7. BUILDING AND RUNNING
------------------------
-Requirements: Android Studio with the Android SDK 35+ and a JDK (the project was built
-with Android Studio's bundled JBR).
+6. PETA RUBRIK
+--------------
+Implementasi layar (15)
+  Lima jenis layar di atas, semuanya disusun dari Column/Row/Box/LazyColumn/
+  FlowRow dengan Modifier dan weight, tanpa posisi hardcoded.
 
-  # debug APK
+Tema UI (15)
+  Seluruh tampilan mengambil warna, huruf, dan bentuk dari ui/theme/:
+    Color.kt    skema Material 3 terang dan gelap, ditambah peran gradien merek
+                agar mode gelap tidak menghasilkan teks putih di atas pastel
+    Type.kt     Plus Jakarta Sans (lisensi OFL) sebagai variable font dengan
+                empat bobot asli, dan skala 15 tingkat
+    Shape.kt    radius 6/10/16/22/30 dp lewat MaterialTheme.shapes
+    Dimens.kt   token Spacing/Elevation/Sizes
+    Theme.kt    menerapkan warna, tipografi, dan bentuk sekaligus
+  Selain itu: warna latar jendela per tema, ikon launcher sendiri, dan kontras
+  ikon status bar yang mengikuti tema pilihan pengguna.
+
+Manajemen state (15)
+  Setiap layar punya ViewModel dengan StateFlow, dikumpulkan lewat
+  collectAsStateWithLifecycle. Aturan turunan ditempel pada state (misalnya
+  AddExpenseUiState.canSave), jadi tampilan tidak bisa berbeda pendapat dengan
+  aturan penulisannya. Keadaan loading, saving, kosong, dan "data hilang"
+  ditangani eksplisit. 123 unit test, 0 gagal.
+
+Navigasi (15)
+  NavHost + NavController dengan nama rute di AppRoutes. Dua argumen dikirim
+  dan dipakai:
+    review/{captureId}          Long — struk yang akan dikonfirmasi
+    transaction/{transactionId} Long — transaksi yang ditampilkan
+  Perilaku back stack diatur per rute, dan transisi layar memakai animasi
+  singkat agar perpindahan terbaca sebagai perpindahan.
+
+Form dan validasi (15)
+  - Jumlah: keyboard angka, hanya angka yang diterima, nol ditolak, dan nilai
+    yang terbaca ditampilkan kembali ("Saves as Rp 45.000") sambil diketik.
+  - Merchant: wajib, kapitalisasi per kata, pesan kesalahan di bawah field.
+  - Kategori: wajib dipilih, ada pesan "Choose one" bila belum.
+  - Catatan: opsional, dihitung sampai 200 karakter.
+  - Tombol simpan mati sampai semua aturan terpenuhi, dan menjelaskan alasannya.
+  - Dialog anggaran dan field anggaran di onboarding memakai aturan yang sama.
+
+Data dummy (15)
+  data/demo/DemoLedger.kt berisi data class DemoExpense dan 18 transaksi yang
+  realistis, mencakup 9 kategori, rentang empat minggu, dua transaksi di hari
+  yang sama, sebagian dengan catatan dan sebagian tanpa. Data ini ditulis ke
+  Room sekali saat instalasi pertama dan hanya bila buku besar masih kosong.
+  Lima di antaranya ditandai sebagai hasil pindai dan benar-benar punya baris
+  capture di basis data, sehingga layar detail menampilkan "From a receipt
+  photo" berdasarkan relasi, bukan flag palsu. Seluruh data bisa dimatikan saat
+  build dengan -PdemoLedger=false.
+
+Dokumentasi dan kelengkapan (10)
+  README ini, APK, proyek dalam zip, dan video demo sesuai naskah bagian 8.
+
+
+7. CARA BUILD DAN MENJALANKAN
+-----------------------------
+Prasyarat: Android Studio dengan Android SDK 35 ke atas dan JDK (proyek ini
+dibangun dengan JBR bawaan Android Studio).
+
+  # APK debug
   gradlew.bat :app:assembleDebug
 
-  # unit tests
+  # unit test
   gradlew.bat :app:testDebugUnitTest
 
-  # debug build WITHOUT the sample ledger
+  # build tanpa data contoh
   gradlew.bat :app:assembleDebug -PdemoLedger=false
 
-The APK to install is app/build/outputs/apk/debug/app-debug.apk.
-On first launch you are asked for a name and a monthly budget; both may be left blank.
-The sample ledger is written on that first launch, so the dashboard, the chart, the
-detail screen and all three analytics tabs have data immediately.
+APK yang dipasang ada di app/build/outputs/apk/debug/app-debug.apk, dan salinan
+untuk penilaian ikut di dalam zip ini (LensSpent.apk).
 
-Architecture in one line: UI (Compose screens) -> ViewModel (StateFlow) -> Repository
-interface -> Room / DataStore. The AI tier is the only collaborator that leaves the
-device, and it is optional.
+Saat pertama kali dibuka, aplikasi meminta nama dan anggaran bulanan; keduanya
+boleh dikosongkan. Data contoh ditulis pada peluncuran pertama itu, sehingga
+dashboard, grafik, layar detail, dan seluruh kompartemen Trends langsung berisi
+data.
 
-
-8. DEMO VIDEO SCRIPT (MAX 5 MINUTES)
-------------------------------------
-Record on a freshly installed APK so the sample data is visible.
-
-0:00-0:20  Intro. Name the app and the group. "LensSpent logs a receipt in seconds and
-           keeps spending on a monthly budget."
-0:20-0:40  ONBOARDING. Show the two pages: the privacy disclosure, then name and budget.
-           Point out the numeric keyboard and the validation on the budget field.
-0:40-1:50  HOME (LIST). Hero card: spent this month, percentage of budget, what is left.
-           Quick stats, then the week chart. Scroll to Recent Transactions and tap a row.
-1:50-2:20  DETAIL. Show the row that was tapped: amount, category, date, note, and how it
-           was created. Point out that the screen was opened with the transaction id —
-           the content is not hardcoded. Back to the list.
-2:20-3:20  FORM. Tap "Add manually". Type an invalid amount (e.g. 45rb) and show the red
-           field + "Use digits only". Fix it, show the live "Saves as Rp ..." echo. Leave
-           the merchant blank to show the required-field error. Pick a category and show
-           Save becoming enabled. Save, and show the new row on the dashboard.
-3:20-3:50  NATIVE SCREEN. Tap "Scan receipt": viewfinder, shutter, gallery import, lens
-           flip, framing tips, and the permission-denied state.
-3:50-4:30  TRENDS (free choice). Daily/Weekly/Yearly/Categories compartments, step through
-           dates, note that the numbers match the dashboard, then show the ranked category
-           breakdown.
-4:30-4:50  THEME. Settings -> Light / Dark. Show the same screens in dark mode to prove
-           the theme is a full colour scheme, not a tint.
-4:50-5:00  Close. One line on what you would build next (edit/edit-existing, real OCR).
-
-Screenshots for the report are in docs/screenshots/, in the order they appear in the
-video script:
-
-  onboarding.png            first launch, step 1 (brand band + privacy promises)
-  profile.png               first launch, step 2 (name + budget, both optional)
-  home.png                  LIST screen: monthly hero, week chart, ledger
-  detail.png                DETAIL screen opened with a transaction id
-  form-empty.png            FORM screen, empty
-  form-error.png            FORM screen, numeric validation rejecting "45rb"
-  form-ready.png            FORM screen, valid and ready to save
-  form-keyboard.png         FORM screen, save bar riding above the IME
-  confirm-expense.png       receipt confirmation (camera path)
-  saved-dialog.png          saved confirmation card
-  trends-daily.png          free-choice screen, Daily compartment
-  trends-weekly.png         free-choice screen, Weekly chart
-  trends-categories.png     free-choice screen, ranked category breakdown
-  settings.png              profile, budget, theme, export
-  camera.png                native-feature screen: viewfinder, shutter, gallery
-  home-dark.png             dark theme
-  saved-dialog.png          confirmation card after a save
-
-Where each rubric criterion is visible:
-
-  Screens          home.png, detail.png, form-*.png, camera.png, trends-*.png
-  Theming          home.png vs home-dark.png, settings.png
-  State            form-empty -> form-error -> form-ready, saved-dialog.png,
-                   trends-daily.png (two stat cards filled from stored rows)
-  Navigation       detail.png was opened from a list row with an id argument;
-                   form-ready.png is the edit route for that same row
-  Validation       form-error.png (isError + supporting text, Save disabled)
-  Dummy data       home.png, trends-categories.png, all-transactions list
+Arsitektur singkat: UI (Compose) -> ViewModel (StateFlow) -> antarmuka
+Repository -> Room/DataStore. Lapisan AI adalah satu-satunya bagian yang
+mengirim data keluar perangkat, dan sifatnya opsional.
 
 
+8. NASKAH VIDEO DEMO (MAKSIMAL 5 MENIT)
+---------------------------------------
+Rekam dari instalasi bersih agar data contoh terlihat.
 
-9. NOTES FOR THE GRADER
------------------------
-- The demo ledger is sample data, not the user's. It is written only into an empty
-  ledger, only in this build, and can be turned off at build time (-PdemoLedger=false).
-- Receipt photos, the ledger and the settings all stay on the device. Only the Premium AI
-  Insights chat sends anything out, and it sends anonymised transaction text.
-- A build without a DeepSeek API key still installs and runs; the chat screen says the key
-  is missing instead of failing a call.
+0:00-0:20  Pembuka. Sebutkan nama aplikasi, kelompok, dan satu kalimat inti:
+           "LensSpent mencatat struk dalam hitungan detik dan menjaga
+           pengeluaran tetap di jalur anggaran bulanan."
+0:20-0:40  ONBOARDING. Tunjukkan dua halaman: penjelasan privasi, lalu nama dan
+           anggaran. Sebut tipe keyboard angka dan validasinya.
+0:40-1:50  HOME (LIST). Kartu anggaran: total bulan ini, persentase, dan sisa
+           anggaran. Ringkasan minggu dan hari ini, lalu grafik mingguan. Gulir
+           ke daftar transaksi dan tekan satu baris.
+1:50-2:20  DETAIL. Tunjukkan transaksi yang tadi ditekan: jumlah, kategori,
+           tanggal, catatan, dan asal transaksi. Jelaskan bahwa layar ini dibuka
+           dengan id transaksi, bukan data hardcoded. Kembali ke daftar.
+2:20-3:20  FORM. Tekan "Add manually". Ketik jumlah yang salah (45rb) untuk
+           menunjukkan pesan kesalahan dan tombol simpan yang mati. Perbaiki,
+           tunjukkan nilai terbaca "Saves as Rp ...". Kosongkan merchant untuk
+           menunjukkan field wajib. Pilih kategori, tunjukkan tombol simpan
+           hidup, lalu simpan dan tunjukkan baris barunya di dashboard. Setelah
+           itu buka baris tersebut, tekan ikon pensil, ubah jumlah, dan simpan
+           untuk menunjukkan bahwa data benar-benar berubah.
+3:20-3:50  LAYAR NATIVE. Tekan "Scan receipt": viewfinder, shutter, impor
+           galeri, ganti lensa, panel tips, dan keadaan izin ditolak.
+3:50-4:30  TRENDS (pilihan bebas). Empat kompartemen, stepper tanggal, grafik,
+           dan peringkat kategori. Sebutkan bahwa angkanya sama dengan
+           dashboard karena dibaca dari basis data yang sama.
+4:30-4:50  TEMA. Pengaturan, lalu Light dan Dark, untuk membuktikan bahwa tema
+           adalah skema warna penuh, bukan sekadar warna yang diganti.
+4:50-5:00  Penutup. Satu kalimat tentang rencana berikutnya.
+
+
+9. CATATAN UNTUK PENILAI
+------------------------
+- Data contoh adalah data contoh, bukan data pengguna. Data ini hanya ditulis ke
+  buku besar yang masih kosong, hanya pada build ini, dan bisa dimatikan saat
+  build.
+- Foto struk, buku besar, dan pengaturan tinggal di perangkat. Hanya obrolan
+  Premium AI Insights yang mengirim teks transaksi yang sudah dianonimkan.
+- Build tanpa kunci API DeepSeek tetap bisa dipasang dan dijalankan; layar
+  obrolan akan menyebutkan bahwa kuncinya belum diatur.
+- Folder .git, build, .gradle, dan local.properties tidak disertakan dalam zip
+  karena bersifat lokal mesin pengembang.
+
+
+10. TANGKAPAN LAYAR
+-------------------
+Tangkapan layar ada di folder docs/screenshots/ dan diambil dari aplikasi yang
+ada di zip ini. Keadaan yang perlu terlihat, beserta kriteria yang dibuktikan:
+
+  Dashboard                 layar LIST: kartu anggaran, grafik mingguan, buku besar
+  Detail transaksi          layar DETAIL yang dibuka dengan id transaksi
+  Form kosong               layar FORM sebelum diisi
+  Form dengan kesalahan     validasi menolak "45rb" (isError + teks pendukung)
+  Form siap simpan          semua aturan terpenuhi, tombol simpan hidup
+  Form saat keyboard muncul tombol simpan tetap terlihat di atas keyboard
+  Konfirmasi struk          jalur kamera: hasil baca OCR bisa dikoreksi
+  Kartu setelah tersimpan   konfirmasi bahwa baris benar-benar masuk
+  Trends: Daily             ringkasan hari yang dipilih
+  Trends: Weekly            grafik mingguan
+  Trends: Categories        peringkat kategori dengan bar proporsi
+  Pengaturan                profil, anggaran, tema, ekspor
+  Kamera                    viewfinder, shutter, galeri, izin ditolak
+  Onboarding                dua langkah peluncuran pertama
+  Dashboard tema gelap      membuktikan tema adalah skema warna penuh
+
+Pemetaan ke rubrik:
+  Layar      dashboard, detail transaksi, form, kamera, trends
+  Tema       dashboard dibandingkan dashboard tema gelap, ditambah pengaturan
+  State      form kosong -> form dengan kesalahan -> form siap simpan
+  Navigasi   detail transaksi dibuka dari baris daftar dengan argumen id
+  Validasi   form dengan kesalahan
+  Data       dashboard dan trends: Categories
