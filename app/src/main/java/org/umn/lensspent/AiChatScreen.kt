@@ -113,7 +113,7 @@ fun AiChatScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Premium • Powered by DeepSeek",
+                            text = "Powered by DeepSeek",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -235,7 +235,7 @@ private fun AwaitingReplyBubble() {
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "Reading your recent spending…",
+                    text = "Reading your recent spending...",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -263,7 +263,7 @@ private fun AiChatInputRow(
             value = draft,
             onValueChange = onDraftChange,
             modifier = Modifier.weight(1f),
-            placeholder = { Text(text = "Ask about your spending…") },
+            placeholder = { Text(text = "Ask about your spending...") },
             shape = MaterialTheme.shapes.large,
             maxLines = 4,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),

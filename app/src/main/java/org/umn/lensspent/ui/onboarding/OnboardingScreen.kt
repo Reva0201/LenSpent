@@ -220,7 +220,7 @@ private fun AgreementPage(onAgree: () -> Unit) {
                     PromiseRow(
                         icon = Icons.Filled.Cloud,
                         title = "AI is opt-in",
-                        detail = "Only the Premium insights chat sends anonymised text to DeepSeek."
+                        detail = "Only the AI insights chat sends anonymised text to DeepSeek."
                     )
                 }
             }

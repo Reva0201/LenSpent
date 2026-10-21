@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import org.umn.lensspent.categoryIcon
 import org.umn.lensspent.data.model.Category
 import org.umn.lensspent.formatIDR
+import org.umn.lensspent.ui.theme.CategoryPalette
 import org.umn.lensspent.ui.theme.Spacing
 
 /**
@@ -387,21 +389,25 @@ fun CategoryShareRow(
 }
 
 /**
- * The category's own colour, from the hex the taxonomy stores.
+ * The category's own colour, from the hex the taxonomy stores, adjusted for the scheme on screen.
  *
  * Categories carry a colour so the charts and the rows can be told apart at a glance. It is the one
  * place raw colour is allowed past the theme, and it is deliberately *data* rather than design: the
- * palette is the taxonomy's, seeded with the app and later editable by the user, not a set of tokens.
+ * palette is the taxonomy's, seeded from [org.umn.lensspent.ui.theme.CategoryPalette] and later editable
+ * by the user, not a set of tokens.
  *
- * An unparseable hex falls back to the theme's primary rather than throwing - a bad colour in one row
+ * Two adjustments happen here rather than at each call site. The stored hex is lifted toward white in
+ * dark mode (a mid-tone that reads well on white paper reads as a smudge on near-black), and an
+ * unparseable hex falls back to the theme's primary rather than throwing - a bad colour in one row
  * should not take a screen down.
  */
 @Composable
-fun categoryTint(colorHex: String): Color {
+fun categoryTint(colorHex: String, dark: Boolean = isSystemInDarkTheme()): Color {
     val fallback = MaterialTheme.colorScheme.primary
-    return remember(colorHex) {
+    val parsed = remember(colorHex) {
         runCatching { Color(AndroidColor.parseColor(colorHex)) }.getOrNull()
     } ?: fallback
+    return if (dark) CategoryPalette.forScheme(parsed, dark = true) else parsed
 }
 
 /**

@@ -545,6 +545,12 @@ private fun SpendingOverviewCard(
  * It earns a gradient disc rather than a plain circle because it is a different kind of thing from the
  * ledger underneath: the accent is the app saying "this one costs money".
  */
+/**
+ * The AI entry point on the dashboard.
+ *
+ * No "PREMIUM" pill: the app has no paid tier behind it, so the label was advertising a distinction
+ * that does not exist. The card says what it does and lets the screen behind it say the rest.
+ */
 @Composable
 private fun AiInsightsCard(onClick: () -> Unit) {
     val hero = LocalHeroColors.current
@@ -575,30 +581,11 @@ private fun AiInsightsCard(onClick: () -> Unit) {
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xxs)
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "AI Insights",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = MaterialTheme.colorScheme.secondaryContainer
-                    ) {
-                        Text(
-                            text = "PREMIUM",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(
-                                horizontal = Spacing.sm,
-                                vertical = Spacing.xxs
-                            )
-                        )
-                    }
-                }
+                Text(
+                    text = "AI Insights",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 Text(
                     text = "Ask about your spending, in plain language",
                     style = MaterialTheme.typography.bodySmall,

@@ -39,9 +39,18 @@ private val Paper = Color(0xFFF5F8FA)
 private val PaperRaised = Color(0xFFFFFFFF)
 private val PaperSunk = Color(0xFFE9F0F4)
 
-private val Night = Color(0xFF080E12)
-private val NightRaised = Color(0xFF0D151A)
-private val NightSunk = Color(0xFF151F26)
+/**
+ * The dark scheme's spine: warm-neutral charcoal rather than blue-black.
+ *
+ * The first dark palette was `#080E12` - near-black with a blue cast. It looked fine in isolation and
+ * wrong on a real screen: against a phone's own black bezel and status bar the page read as a hole, and
+ * the blue tint made every card look like a slightly different shade of the background. These values are
+ * a touch lighter and almost neutral, with the blue kept to a hint rather than a cast. That is what lets
+ * a card at `NightRaised` be legibly *above* the page instead of a rectangle you have to hunt for.
+ */
+private val Night = Color(0xFF101418)
+private val NightRaised = Color(0xFF181D22)
+private val NightSunk = Color(0xFF1D2329)
 
 private val Red600 = Color(0xFFB3261E)
 private val Red300 = Color(0xFFFFB4AB)
@@ -93,8 +102,8 @@ internal val LightHeroColors = HeroColors(
  * surface from the page, so it is lighter than `background`, not darker.
  */
 internal val DarkHeroColors = HeroColors(
-    start = Color(0xFF12314A),
-    end = Color(0xFF0E2333),
+    start = Color(0xFF1B3B52),
+    end = Color(0xFF142B3D),
     content = Color(0xFFE6F1F7),
     contentMuted = Color(0xFFE6F1F7).copy(alpha = 0.72f),
     accent = Color(0xFF5FD8CB)
@@ -175,10 +184,10 @@ internal val LensSpentDarkColors = darkColorScheme(
     outlineVariant = Color(0xFF33434C),
     scrim = Color.Black,
     surfaceBright = Color(0xFF2A3A44),
-    surfaceDim = Night,
-    surfaceContainerLowest = Ink900,
-    surfaceContainerLow = Color(0xFF111A20),
+    surfaceDim = Color(0xFF0C1013),
+    surfaceContainerLowest = Color(0xFF0A0E11),
+    surfaceContainerLow = Color(0xFF151A1F),
     surfaceContainer = NightSunk,
-    surfaceContainerHigh = Color(0xFF1B262E),
-    surfaceContainerHighest = Color(0xFF22303A)
+    surfaceContainerHigh = Color(0xFF232A31),
+    surfaceContainerHighest = Color(0xFF2C343C)
 )
