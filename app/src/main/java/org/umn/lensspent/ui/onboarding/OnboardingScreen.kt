@@ -45,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.umn.lensspent.AppViewModelProvider
 import org.umn.lensspent.ui.budgetSupportingText
+import org.umn.lensspent.ui.theme.LocalHeroColors
 
 private object OnboardingDimens {
     val Gutter = 24.dp
@@ -126,28 +127,22 @@ private fun AgreementPage(onAgree: () -> Unit) {
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center
         ) {
+            val hero = LocalHeroColors.current
 
-        // The app's mark, at size, because this is the one screen with room for it. Drawn as a
-        // gradient disc rather than shipped as an image: it is the same primary-to-tertiary pair the
-        // launcher icon uses, so the icon the user tapped and the screen they landed on agree.
-        Box(
+            // The app's mark, at size, because this is the one screen with room for it. Painted with the
+            // same hero colours as the dashboard, so the first screen and the screen it leads to are
+            // recognisably the same app in both light and dark mode.
+            Box(
             modifier = Modifier
                 .size(88.dp)
                 .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.tertiary
-                        )
-                    )
-                ),
+                .background(Brush.linearGradient(listOf(hero.start, hero.end))),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimary,
+                tint = hero.content,
                 modifier = Modifier.size(40.dp)
             )
         }

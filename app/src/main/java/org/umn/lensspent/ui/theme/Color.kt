@@ -64,26 +64,38 @@ data class HeroColors(
     /** Text and icons drawn directly on the gradient. */
     val content: Color,
     /** Secondary text on the gradient: labels, units, supporting lines. */
-    val contentMuted: Color
-)
-
-/** Deep ink into teal, with white on top: the "expensive" look, in light mode only. */
-internal val LightHeroColors = HeroColors(
-    start = Ink700,
-    end = Teal700,
-    content = Color.White,
-    contentMuted = Color.White.copy(alpha = 0.78f)
+    val contentMuted: Color,
+    /** The one accent allowed on the hero: the ring that shows budget used. */
+    val accent: Color
 )
 
 /**
- * The same idea at a much lower brightness: a deep ocean-to-teal pair that stays a *surface* in dark
- * mode rather than a lamp, with the pale ink as its content.
+ * A near-black ink card with a teal ring on it, in light mode.
+ *
+ * The first version of this was a primary-to-tertiary diagonal sweep. That is the tell of a designed-by-
+ * default app: two brand hues crossing at 45 degrees gives the card no single colour to be, and nothing
+ * on it has a stronger edge than the gradient. This pair is deliberately almost flat - the second stop
+ * is a few points of lightness away from the first - so the card reads as one dark surface with a
+ * single accent, which is what the total needs to sit on.
+ */
+internal val LightHeroColors = HeroColors(
+    start = Color(0xFF0B2E3F),
+    end = Color(0xFF0E3D4E),
+    content = Color.White,
+    contentMuted = Color.White.copy(alpha = 0.68f),
+    accent = Color(0xFF5FD8CB)
+)
+
+/**
+ * The same card lifted just above the dark background: dark mode still needs the hero to be a
+ * *different* surface from the page, so it is a few points lighter than `background`, not darker.
  */
 internal val DarkHeroColors = HeroColors(
-    start = Color(0xFF0B4A6B),
-    end = Color(0xFF005149),
-    content = Color(0xFFE3F2FB),
-    contentMuted = Color(0xFFE3F2FB).copy(alpha = 0.72f)
+    start = Color(0xFF101C24),
+    end = Color(0xFF14232C),
+    content = Color(0xFFE6F1F7),
+    contentMuted = Color(0xFFE6F1F7).copy(alpha = 0.66f),
+    accent = Color(0xFF5FD8CB)
 )
 
 internal val LensSpentLightColors = lightColorScheme(

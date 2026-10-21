@@ -6,32 +6,38 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -50,6 +56,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,6 +65,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.umn.lensspent.data.model.Category
+import org.umn.lensspent.ui.theme.Elevation
+import org.umn.lensspent.ui.theme.Sizes
+import org.umn.lensspent.ui.theme.Spacing
 
 private val PreviewHeight = 200.dp
 
@@ -90,7 +101,7 @@ fun ExpenseReviewScreen(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(text = "Confirm expense", fontWeight = FontWeight.Bold) },
+                title = { Text(text = "Confirm expense", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onFinished) {
                         Icon(
@@ -102,6 +113,14 @@ fun ExpenseReviewScreen(
                 // Edge-to-edge is enabled, so the app bar keeps its status bar inset
                 windowInsets = TopAppBarDefaults.windowInsets
             )
+        },
+        bottomBar = {
+            // The actions belong to the editable state only: there is nothing to save while the
+            // receipt is still being read, and nothing to discard once it has been.
+            val state = uiState
+            if (state is ExpenseReviewUiState.Editing) {
+                ReviewActionBar(state = state, viewModel = viewModel)
+            }
         }
     ) { paddingValues ->
         when (val state = uiState) {
@@ -226,8 +245,10 @@ private fun UnavailablePane(modifier: Modifier, onDismiss: () -> Unit) {
 /**
  * The editable draft.
  *
- * Save stays disabled until there is a merchant, a positive amount and a category, so the ledger can
- * only ever receive complete rows.
+ * The order is the order it is read in: what was photographed, then the number, then who and which
+ * category, then when. The amount is the first field and the biggest, because it is the one value a
+ * receipt is opened to check. Save stays disabled until there is a merchant, a positive amount and a
+ * category, so the ledger can only ever receive complete rows.
  */
 @Composable
 private fun EditingPane(
@@ -249,44 +270,73 @@ private fun EditingPane(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .imePadding()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = Spacing.xl, vertical = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xxl)
     ) {
         CapturePreview(preview = preview)
 
         OutlinedTextField(
-            value = state.merchant,
-            onValueChange = viewModel::onMerchantChange,
-            label = { Text(text = "Merchant") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        OutlinedTextField(
             value = state.amountText,
             onValueChange = viewModel::onAmountChange,
-            label = { Text(text = "Total (Rp)") },
+            label = { Text(text = "Total") },
+            prefix = {
+                Text(
+                    text = "Rp",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
             singleLine = true,
             isError = state.amountError,
             supportingText = {
                 val amount = state.amountRupiah
                 Text(
                     text = when {
-                        state.amountError -> "Enter the total printed on the receipt."
-                        amount != null && amount > 0L -> formatIDR(amount)
-                        else -> "Whole Rupiah, for example 1.250.000"
+                        state.amountError -> "Enter the total printed on the receipt"
+                        amount != null && amount > 0L -> "Saves as ${formatIDR(amount)}"
+                        else -> "Whole Rupiah, digits only"
                     }
                 )
             },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            textStyle = MaterialTheme.typography.headlineSmall,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done
+            ),
+            shape = MaterialTheme.shapes.medium,
             modifier = Modifier.fillMaxWidth()
         )
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        OutlinedTextField(
+            value = state.merchant,
+            onValueChange = viewModel::onMerchantChange,
+            label = { Text(text = "Merchant") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Storefront,
+                    contentDescription = null,
+                    modifier = Modifier.size(Sizes.iconSmall)
+                )
+            },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Words,
+                imeAction = ImeAction.Next
+            ),
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        CategoryPicker(
+            categories = state.categories,
+            selectedCategoryId = state.selectedCategoryId,
+            onSelect = viewModel::onCategorySelected
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Text(
                 text = "Date",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             // The shared stepper, so this screen and analytics step dates identically
@@ -298,34 +348,73 @@ private fun EditingPane(
             )
         }
 
-        CategoryPicker(
-            categories = state.categories,
-            selectedCategoryId = state.selectedCategoryId,
-            onSelect = viewModel::onCategorySelected
-        )
+        Spacer(modifier = Modifier.height(Spacing.xxl))
+    }
+}
 
-        Button(
-            onClick = viewModel::save,
-            enabled = state.canSave,
-            modifier = Modifier.fillMaxWidth()
+/**
+ * Save and Discard, always reachable.
+ *
+ * The pair used to be two elements at the end of the scrolling panel: a full-width button and a text
+ * button under it. On a phone that pushed Discard off screen and left Save under the keyboard. One bar
+ * with the destructive-ish choice demoted to text and the primary action on the right keeps both
+ * visible and makes the safe choice the obvious one.
+ */
+@Composable
+private fun ReviewActionBar(
+    state: ExpenseReviewUiState.Editing,
+    viewModel: ExpenseReviewViewModel
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = Elevation.floating
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(horizontal = Spacing.xl, vertical = Spacing.md),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (state.isSaving) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary
+            TextButton(
+                onClick = viewModel::discard,
+                enabled = !state.isSaving
+            ) {
+                Text(
+                    text = "Discard",
+                    style = MaterialTheme.typography.labelLarge
                 )
-            } else {
-                Text(text = "Save expense")
             }
-        }
 
-        TextButton(
-            onClick = viewModel::discard,
-            enabled = !state.isSaving,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        ) {
-            Text(text = "Discard")
+            Button(
+                onClick = viewModel::save,
+                enabled = state.canSave,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                shape = MaterialTheme.shapes.large
+            ) {
+                if (state.isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(Sizes.iconSmall),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(Sizes.iconSmall)
+                    )
+                    Spacer(modifier = Modifier.size(Spacing.sm))
+                    Text(
+                        text = "Save expense",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
         }
     }
 }
@@ -358,32 +447,47 @@ private fun CapturePreview(preview: ImageBitmap?) {
     }
 }
 
-/** Horizontally scrolling chips straight from the stored taxonomy, icons included. */
+/** The taxonomy as wrapping chips, the same control the manual form uses for the same choice. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CategoryPicker(
     categories: List<Category>,
     selectedCategoryId: Long?,
     onSelect: (Long) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(
             text = "Category",
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(categories, key = { it.id }) { category ->
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            categories.forEach { category ->
                 FilterChip(
                     selected = category.id == selectedCategoryId,
                     onClick = { onSelect(category.id) },
-                    label = { Text(text = category.name) },
+                    label = {
+                        Text(
+                            text = category.name,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    },
                     leadingIcon = {
                         Icon(
                             imageVector = categoryIcon(category.iconKey),
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(Sizes.iconSmall)
                         )
-                    }
+                    },
+                    shape = MaterialTheme.shapes.small,
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 )
             }
         }

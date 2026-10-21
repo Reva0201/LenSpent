@@ -1,15 +1,20 @@
 package org.umn.lensspent.ui.settings
 
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -19,13 +24,11 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -42,11 +45,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -57,6 +63,7 @@ import org.umn.lensspent.formatIDR
 import org.umn.lensspent.ui.budgetSupportingText
 import org.umn.lensspent.ui.parseBudgetInput
 import org.umn.lensspent.ui.theme.Elevation
+import org.umn.lensspent.ui.theme.Sizes
 import org.umn.lensspent.ui.theme.Spacing
 
 private object SettingsDimens {
@@ -117,11 +124,11 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = SettingsDimens.Gutter),
+                .padding(horizontal = SettingsDimens.Gutter)
+                .padding(top = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(SettingsDimens.ItemSpacing)
         ) {
-            SectionHeader("Profile")
-            SettingsCard { ProfileSection(username = uiState.username) }
+            ProfileHeader(username = uiState.username)
 
             // Directly under the name, the way onboarding asked for them: the ceiling is the one
             // setting on this screen that the dashboard draws with.
@@ -143,6 +150,15 @@ fun SettingsScreen(
 
             SectionHeader("Data")
             SettingsCard { DataSection(onExportTransactions = viewModel::exportTransactions) }
+
+            Spacer(Modifier.height(SettingsDimens.SectionSpacing))
+            Text(
+                text = "LensSpent 1.0 — your ledger stays on this device",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             Spacer(Modifier.height(SettingsDimens.BottomSpacing))
         }
@@ -186,17 +202,116 @@ private fun SettingsCard(content: @Composable () -> Unit) {
     }
 }
 
-/** Who the app greets. Read-only: onboarding asked once, and the answer is a display name, nothing more. */
+/** Who the app greets, as a header rather than a row: this screen is about one person's ledger. */
 @Composable
-private fun ProfileSection(username: String) {
-    ListItem(
-        headlineContent = {
-            Text(username.ifBlank { "No name set" })
-        },
-        supportingContent = { Text("How the dashboard greets you. It never leaves this device.") },
-        leadingContent = {
-            Icon(imageVector = Icons.Filled.Person, contentDescription = null)
+private fun ProfileHeader(username: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = Elevation.raised
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.xl),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = username.trim().firstOrNull()?.uppercase() ?: "L",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                Text(
+                    text = username.ifBlank { "No name set" },
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Local profile · never leaves this device",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
+    }
+}
+
+/**
+ * One settings row: a tinted icon square, a title, an optional line of supporting text, and whatever
+ * trailing affordance the row needs.
+ *
+ * `ListItem` was doing this job before and was the reason the screen felt like a dump: it sets the
+ * headline at body size, adds 72dp of leading space for the icon, and pads every row the same whether
+ * it carries a sentence or three words. A row that is 48dp tall and one line wide reads as a setting;
+ * one that is 90dp tall reads as a paragraph.
+ */
+@Composable
+private fun SettingsRow(
+    icon: ImageVector,
+    title: String,
+    supporting: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    onClick: (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(Sizes.iconSmall)
+            )
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (supporting != null) {
+                Text(
+                    text = supporting,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        trailing?.invoke()
+    }
+}
+
+@Composable
+private fun RowChevron() {
+    Icon(
+        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -214,29 +329,16 @@ private fun BudgetSection(
 ) {
     var isEditing by remember { mutableStateOf(false) }
 
-    ListItem(
-        headlineContent = {
-            Text(
-                text = if (monthlyBudgetIdr > NoBudgetIdr) {
-                    "${formatIDR(monthlyBudgetIdr)} a month"
-                } else {
-                    "No budget set"
-                }
-            )
+    SettingsRow(
+        icon = Icons.Filled.AccountBalanceWallet,
+        title = if (monthlyBudgetIdr > NoBudgetIdr) {
+            "${formatIDR(monthlyBudgetIdr)} a month"
+        } else {
+            "No budget set"
         },
-        supportingContent = {
-            Text("The ceiling the dashboard measures this month's spending against.")
-        },
-        leadingContent = {
-            Icon(imageVector = Icons.Filled.AccountBalanceWallet, contentDescription = null)
-        },
-        trailingContent = {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null
-            )
-        },
-        modifier = Modifier.clickable { isEditing = true }
+        supporting = "The ceiling the dashboard measures against",
+        trailing = { RowChevron() },
+        onClick = { isEditing = true }
     )
 
     if (isEditing) {
@@ -310,39 +412,44 @@ private fun PreferencesSection(
     themePreference: ThemePreference,
     onThemeSelected: (ThemePreference) -> Unit
 ) {
-    ListItem(
-        headlineContent = { Text("Theme") },
-        supportingContent = { Text("System follows your phone's dark mode setting.") },
-        leadingContent = {
-            Icon(imageVector = Icons.Filled.Palette, contentDescription = null)
-        }
+    SettingsRow(
+        icon = Icons.Filled.Palette,
+        title = "Theme",
+        supporting = "Light, dark, or the phone's setting"
     )
     SingleChoiceSegmentedButtonRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = SettingsDimens.FieldSpacing)
+            .padding(start = 62.dp, end = Spacing.lg, bottom = Spacing.md)
     ) {
         val options = ThemePreference.entries
         options.forEachIndexed { index, preference ->
             SegmentedButton(
                 selected = preference == themePreference,
                 onClick = { onThemeSelected(preference) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size)
+                // Rounded to the same radius as the cards, instead of Material's square-cornered
+                // default, which cut across the bottom of the card it sits in.
+                shape = SegmentedButtonDefaults.itemShape(
+                    index = index,
+                    count = options.size,
+                    baseShape = MaterialTheme.shapes.small
+                )
             ) {
-                Text(preference.label())
+                Text(
+                    text = preference.label(),
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
         }
     }
 
-    ListItem(
-        headlineContent = { Text("Language") },
-        supportingContent = { Text("English for now; Bahasa Indonesia is planned.") },
-        leadingContent = {
-            Icon(imageVector = Icons.Filled.Language, contentDescription = null)
-        },
-        trailingContent = {
+    SettingsRow(
+        icon = Icons.Filled.Language,
+        title = "Language",
+        trailing = {
             Text(
                 text = "English",
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -359,19 +466,12 @@ private fun ThemePreference.label(): String = when (this) {
 /** Getting the ledger out: the one row here that leaves the app, and it only ever does so on request. */
 @Composable
 private fun DataSection(onExportTransactions: () -> Unit) {
-    ListItem(
-        headlineContent = { Text("Export transactions to CSV") },
-        supportingContent = { Text("Shares every expense as a file you can open in a spreadsheet.") },
-        leadingContent = {
-            Icon(imageVector = Icons.Filled.Share, contentDescription = null)
-        },
-        trailingContent = {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null
-            )
-        },
-        modifier = Modifier.clickable(onClick = onExportTransactions)
+    SettingsRow(
+        icon = Icons.Filled.Share,
+        title = "Export transactions to CSV",
+        supporting = "Every expense as a CSV file",
+        trailing = { RowChevron() },
+        onClick = onExportTransactions
     )
 }
 

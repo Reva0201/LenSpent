@@ -1,5 +1,10 @@
 package org.umn.lensspent.ui
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -26,6 +31,10 @@ private const val CaptureIdArg = "captureId"
 
 /** The expense a detail screen was opened for, as it appears in the route. */
 private const val TransactionIdArg = "transactionId"
+
+/** Screen transition timing: quick enough to feel like a tap, not a scene change. */
+private const val ScreenFadeInMillis = 220
+private const val ScreenFadeOutMillis = 160
 
 /**
  * Every destination in the app, named once.
@@ -85,7 +94,31 @@ fun LensSpentNavHost(
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        modifier = modifier
+        modifier = modifier,
+        // A short fade with a few dp of horizontal travel. Long enough that pushing a screen reads as
+        // a transition rather than a cut, short enough that the back stack never feels laggy. The
+        // distance is deliberately small: this is a ledger, and a slide that travels the full width
+        // makes every tap feel like a bigger event than opening one expense.
+        enterTransition = {
+            fadeIn(animationSpec = tween(ScreenFadeInMillis)) +
+                slideInHorizontally(
+                    animationSpec = tween(ScreenFadeInMillis),
+                    initialOffsetX = { it / 12 }
+                )
+        },
+        exitTransition = {
+            fadeOut(animationSpec = tween(ScreenFadeOutMillis))
+        },
+        popEnterTransition = {
+            fadeIn(animationSpec = tween(ScreenFadeInMillis))
+        },
+        popExitTransition = {
+            fadeOut(animationSpec = tween(ScreenFadeOutMillis)) +
+                slideOutHorizontally(
+                    animationSpec = tween(ScreenFadeOutMillis),
+                    targetOffsetX = { it / 12 }
+                )
+        }
     ) {
         composable(AppRoutes.Onboarding) {
             OnboardingScreen(
