@@ -15,18 +15,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -45,24 +47,26 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.umn.lensspent.AppViewModelProvider
 import org.umn.lensspent.ui.budgetSupportingText
+import org.umn.lensspent.ui.components.LensCard
 import org.umn.lensspent.ui.theme.LocalHeroColors
+import org.umn.lensspent.ui.theme.Spacing
 
 private object OnboardingDimens {
-    val Gutter = 24.dp
-    val TitleSpacing = 8.dp
-    val SectionSpacing = 32.dp
-    val BulletSpacing = 20.dp
-    val BulletIcon = 24.dp
-    val BulletIconGap = 12.dp
-    val BulletTitleSpacing = 2.dp
-    val FieldSpacing = 24.dp
-    val ButtonHeight = 52.dp
-    val BottomSpacing = 24.dp
+    val Gutter = 28.dp
+    val HeroHeight = 340.dp
+    val ButtonHeight = 56.dp
+    val PromiseIcon = 40.dp
+    val DotWidth = 24.dp
+    val DotHeight = 6.dp
 }
 
 /**
- * The two pages a first launch walks through: what the app does with the user's data, then who it is
- * greeting and what they plan to spend.
+ * The two pages a first launch walks through: what the app is and what it does with the user's data,
+ * then the name and the ceiling.
+ *
+ * The shape is deliberate. Page one is a launch screen, not a consent form: a brand band, two promises,
+ * one button. Page two is the only place the app asks for anything, so it asks for two things and says
+ * that both are optional.
  *
  * [onFinished] is called once the profile write has landed, not when the button is tapped - the flag
  * that ends onboarding lives in the same transaction as the name and the budget, so the dashboard can
@@ -90,9 +94,8 @@ fun OnboardingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = OnboardingDimens.Gutter)
-                // The name field sits low on a short screen, so the "Start Tracking" button below it
-                // has to rise with the keyboard rather than hide behind it.
+                // The budget field sits low on a short screen, so the button below it has to rise with
+                // the keyboard rather than hide behind it.
                 .imePadding()
         ) {
             when (uiState.step) {
@@ -112,120 +115,180 @@ fun OnboardingScreen(
 }
 
 /**
- * Page one: the disclosure, then the one button that accepts it.
+ * Page one: the brand, the two promises, and the one way forward.
  *
- * Agreeing is what moves the user on, so there is no separate consent switch - the flow itself is the
- * record, and the only thing stored afterwards is that onboarding is done.
+ * A tinted band across the top rather than a logo floating in white space: this is the first frame the
+ * app ever draws, and it should look like a product before it looks like a form. The two promises are
+ * rows with their own icon squares, not cards, because cards here read as sections of a settings page.
  */
 @Composable
 private fun AgreementPage(onAgree: () -> Unit) {
+    val hero = LocalHeroColors.current
+
     Column(modifier = Modifier.fillMaxSize()) {
-        // The block is centred in the space above the button rather than pinned to the top: with the
-        // title and two cards it occupies about a third of a tall phone, and a top-aligned column left
-        // a dead two-thirds between the last card and the only button on the screen.
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.Center
-        ) {
-            val hero = LocalHeroColors.current
-
-            // The app's mark, at size, because this is the one screen with room for it. Painted with the
-            // same hero colours as the dashboard, so the first screen and the screen it leads to are
-            // recognisably the same app in both light and dark mode.
-            Box(
-            modifier = Modifier
-                .size(88.dp)
-                .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(hero.start, hero.end))),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
-                contentDescription = null,
-                tint = hero.content,
-                modifier = Modifier.size(40.dp)
-            )
-        }
-
-        Spacer(Modifier.height(OnboardingDimens.SectionSpacing))
-        Text(
-            text = "Welcome to LensSpent",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Snap a receipt, and the ledger keeps itself.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = OnboardingDimens.TitleSpacing)
-        )
-
-        Spacer(Modifier.height(OnboardingDimens.SectionSpacing))
-        // The two disclosures as cards: they are separate promises, and separating them is what stops
-        // the "sends text to DeepSeek" line from reading as a footnote to the local-only one.
-        DisclosureCard(
-            icon = Icons.Filled.Lock,
-            title = "100% Local Core",
-            detail = "Receipt photos never leave this device."
-        )
-        Spacer(Modifier.height(OnboardingDimens.BulletSpacing))
-        DisclosureCard(
-            icon = Icons.Filled.Cloud,
-            title = "Premium Cloud AI",
-            detail = "Asking AI for insights sends anonymized text to DeepSeek."
-        )
-        }
-
-        // Pushed to the bottom: the button has to be where the thumb already is on a tall screen.
-        Button(
-            onClick = onAgree,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(OnboardingDimens.ButtonHeight),
-            shape = MaterialTheme.shapes.large
+                .height(OnboardingDimens.HeroHeight)
+                .clip(
+                    RoundedCornerShape(
+                        bottomStart = 36.dp,
+                        bottomEnd = 36.dp
+                    )
+                )
+                .background(Brush.verticalGradient(listOf(hero.start, hero.end)))
+                .padding(horizontal = OnboardingDimens.Gutter, vertical = Spacing.xxxl)
         ) {
-            Text(
-                text = "Agree & Continue",
-                style = MaterialTheme.typography.labelLarge
-            )
+            Column(modifier = Modifier.align(Alignment.BottomStart)) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(hero.content.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
+                        contentDescription = null,
+                        tint = hero.content,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                Spacer(Modifier.height(Spacing.xl))
+                Text(
+                    text = "LensSpent",
+                    style = MaterialTheme.typography.displaySmall,
+                    color = hero.content
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    text = "Snap a receipt. Know where the month went.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = hero.contentMuted
+                )
+            }
         }
-        Spacer(Modifier.height(OnboardingDimens.BottomSpacing))
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = OnboardingDimens.Gutter),
+            // Centred in what is left of the page rather than pinned under the band: two rows of prose
+            // stranded at the top left left the bottom half of the screen empty.
+            verticalArrangement = Arrangement.spacedBy(
+                space = Spacing.xxl,
+                alignment = Alignment.CenterVertically
+            )
+        ) {
+            // The promises share one bordered surface. On their own they were two lines of grey prose
+            // floating in white space; in a card they read as one statement about the app, and the page
+            // has a middle instead of a gap.
+            LensCard {
+                Column(
+                    modifier = Modifier.padding(Spacing.xl),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+                ) {
+                    PromiseRow(
+                        icon = Icons.Filled.Lock,
+                        title = "Read on this device",
+                        detail = "Receipt photos are processed on the phone and never uploaded."
+                    )
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+                    )
+                    PromiseRow(
+                        icon = Icons.Filled.Cloud,
+                        title = "AI is opt-in",
+                        detail = "Only the Premium insights chat sends anonymised text to DeepSeek."
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier.padding(
+                horizontal = OnboardingDimens.Gutter,
+                vertical = OnboardingDimens.Gutter
+            ),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl)
+        ) {
+            StepDots(activeIndex = 0)
+            Button(
+                onClick = onAgree,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(OnboardingDimens.ButtonHeight),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Text(
+                    text = "Get started",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+        }
     }
 }
 
-/** One disclosure, as a card: what it covers, then the plain-language consequence. */
+/** One promise: what it covers, then the plain-language consequence. */
 @Composable
-private fun DisclosureCard(icon: ImageVector, title: String, detail: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface
+private fun PromiseRow(icon: ImageVector, title: String, detail: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+        verticalAlignment = Alignment.Top
     ) {
-        Row(
-            modifier = Modifier.padding(OnboardingDimens.BulletIconGap + OnboardingDimens.BulletTitleSpacing),
-            verticalAlignment = Alignment.Top
+        Box(
+            modifier = Modifier
+                .size(OnboardingDimens.PromiseIcon)
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 // The title beside it says the same thing, so the icon adds nothing for a screen reader.
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(OnboardingDimens.BulletIcon)
+                modifier = Modifier.size(20.dp)
             )
-            Spacer(Modifier.width(OnboardingDimens.BulletIconGap))
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = OnboardingDimens.BulletTitleSpacing)
-                )
-            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * Where the user is in the flow.
+ *
+ * Two steps, drawn as two dots with the current one stretched: with pages this short a numbered stepper
+ * would be louder than the content, but a bare "1 of 2" is a sentence where a shape will do.
+ */
+@Composable
+private fun StepDots(activeIndex: Int, count: Int = 2) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        repeat(count) { index ->
+            Box(
+                modifier = Modifier
+                    .height(OnboardingDimens.DotHeight)
+                    .width(if (index == activeIndex) OnboardingDimens.DotWidth else OnboardingDimens.DotHeight)
+                    .clip(CircleShape)
+                    .background(
+                        if (index == activeIndex) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant
+                        }
+                    )
+            )
         }
     }
 }
@@ -234,8 +297,9 @@ private fun DisclosureCard(icon: ImageVector, title: String, detail: String) {
  * Page two: the name and the monthly budget, and the button that starts the ledger.
  *
  * Both fields may be left blank. The dashboard falls back to a generic greeting, and the budget card
- * only draws a progress bar once there is a ceiling to draw it against - the app would rather say
- * nothing about a budget than put a number on screen that the user never chose.
+ * only draws a progress line once there is a ceiling to draw it against - the app would rather say
+ * nothing about a budget than put a number on screen that the user never chose. The page says so in one
+ * line instead of the paragraph it used to open with.
  */
 @Composable
 private fun ProfilePage(
@@ -250,73 +314,125 @@ private fun ProfilePage(
     // Only unreadable text blocks the button, and clearing the field always clears that, so this can
     // never strand the user on this page - it just refuses to throw a number away.
     val budgetIsReadable = monthlyBudgetIdr != null
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Start,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.md, vertical = Spacing.md),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack) { Text("Back") }
+            TextButton(onClick = onBack) {
+                Text(
+                    text = "Back",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+            StepDots(activeIndex = 1)
         }
-        Spacer(Modifier.height(OnboardingDimens.TitleSpacing))
-        Text(
-            text = "What should we call you?",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Both of these stay on this device. Leave the name blank and the dashboard will just " +
-                "say hello, or leave the budget blank and set it later in Settings.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = OnboardingDimens.TitleSpacing)
-        )
 
-        OutlinedTextField(
-            value = username,
-            onValueChange = onUsernameChange,
-            label = { Text("Your name") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = OnboardingDimens.FieldSpacing)
-        )
-
-        OutlinedTextField(
-            value = budgetText,
-            onValueChange = onBudgetChange,
-            label = { Text("Monthly budget") },
-            singleLine = true,
-            prefix = { Text("Rp") },
-            isError = !budgetIsReadable,
-            supportingText = { Text(budgetSupportingText(budgetText, monthlyBudgetIdr)) },
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Number,
-                imeAction = ImeAction.Done
-            ),
-            // "Done" starts the app too: by then the keyboard is covering the button, and making the
-            // user dismiss it to reach the same action is a tap for nothing. Unreadable text is left
-            // alone, exactly as the button is.
-            keyboardActions = KeyboardActions(
-                onDone = { if (budgetIsReadable) onStartTracking() }
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = OnboardingDimens.FieldSpacing)
-        )
-
-        Spacer(Modifier.weight(1f))
-        Button(
-            onClick = onStartTracking,
-            enabled = budgetIsReadable,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(OnboardingDimens.ButtonHeight)
+                .weight(1f)
+                .padding(horizontal = OnboardingDimens.Gutter),
+            // Centred between the header and the button, the same as page one: two fields pinned to the
+            // top left the last half of the screen blank.
+            verticalArrangement = Arrangement.spacedBy(
+                space = Spacing.lg,
+                alignment = Alignment.CenterVertically
+            )
         ) {
-            Text("Start Tracking")
+            Text(
+                text = "Make it yours",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = "A name for the greeting, and a monthly ceiling to measure against. " +
+                    "Both are optional - you can set them later in Settings.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(Spacing.md))
+
+            OutlinedTextField(
+                value = username,
+                onValueChange = onUsernameChange,
+                label = { Text("Your name") },
+                placeholder = { Text("Optional") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Next
+                ),
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = budgetText,
+                onValueChange = onBudgetChange,
+                label = { Text("Monthly budget") },
+                placeholder = { Text("Optional") },
+                singleLine = true,
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.AccountBalanceWallet,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                prefix = {
+                    Text(
+                        text = "Rp",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                isError = !budgetIsReadable,
+                supportingText = { Text(budgetSupportingText(budgetText, monthlyBudgetIdr)) },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                ),
+                // "Done" starts the app too: by then the keyboard is covering the button, and making
+                // the user dismiss it to reach the same action is a tap for nothing. Unreadable text
+                // is left alone, exactly as the button is.
+                keyboardActions = KeyboardActions(
+                    onDone = { if (budgetIsReadable) onStartTracking() }
+                ),
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
-        Spacer(Modifier.height(OnboardingDimens.BottomSpacing))
+
+        Column(
+            modifier = Modifier.padding(
+                horizontal = OnboardingDimens.Gutter,
+                vertical = OnboardingDimens.Gutter
+            )
+        ) {
+            Button(
+                onClick = onStartTracking,
+                enabled = budgetIsReadable,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(OnboardingDimens.ButtonHeight),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Text(
+                    text = "Start tracking",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+        }
     }
 }
