@@ -5,6 +5,7 @@ import android.animation.ValueAnimator
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -12,11 +13,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -208,15 +211,18 @@ fun CategoryTilePicker(
 }
 
 /**
- * A segmented switcher: one track, and the selected segment as a raised pill inside it.
+ * A segmented switcher: one track, and the selected segment as a pill that slides between them.
  *
- * The Material tab row underneath this screen was a line of text with an underscore that moved - a
- * control that says "these are tabs" without saying anything about which one is chosen beyond 2dp of
- * colour. A pill on a recessed track shows the selection as an object, and the sliding background
- * animates so a swipe of the pager and a tap on the segment look like the same event.
+ * The Material tab row underneath this screen was a line of text with an underscore that jumped. The
+ * selection here is an object: a filled pill that travels to the segment you chose over 280ms, and
+ * travels back when you swipe the pager, so a tap and a swipe look like the same event.
  *
- * Four options is the practical maximum for this shape on a phone: past that, the labels stop fitting
- * on one line and the control becomes a scrollable list of buttons.
+ * The travel is computed rather than measured per segment: the options share the width equally, so the
+ * pill's offset is `index * (segment + gap)`. That keeps the animation on a single animated Dp and means
+ * the pill cannot land a pixel off, which per-segment x-coordinates are prone to after a rotation.
+ *
+ * Four options is the practical maximum for this shape on a phone: past that, the labels stop fitting on
+ * one line and the control becomes a row of truncated words.
  */
 @Composable
 fun SegmentedTabs(
@@ -225,6 +231,10 @@ fun SegmentedTabs(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val gap = Spacing.xs
+    val inset = Spacing.xs
+    val segmentHeight = 40.dp
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -234,50 +244,53 @@ fun SegmentedTabs(
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
         )
     ) {
-        Row(
-            modifier = Modifier.padding(Spacing.xs),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-        ) {
-            options.forEachIndexed { index, label ->
-                val selected = index == selectedIndex
-                // The selected segment is filled with the brand container rather than white-on-white:
-                // a white pill inside a white track is only legible through its shadow, which is
-                // exactly what made the first version of this control read as grey smudge.
-                val container by animateColorAsState(
-                    targetValue = if (selected) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        Color.Transparent
-                    },
-                    animationSpec = tween(durationMillis = 180),
-                    label = "segment-container"
-                )
-                val contentColor by animateColorAsState(
-                    targetValue = if (selected) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    animationSpec = tween(durationMillis = 180),
-                    label = "segment-content"
-                )
+        BoxWithConstraints(modifier = Modifier.padding(inset)) {
+            val segmentWidth = (maxWidth - gap * (options.size - 1)) / options.size
+            val pillOffset by animateDpAsState(
+                targetValue = (segmentWidth + gap) * selectedIndex,
+                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                label = "segment-pill-offset"
+            )
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(container)
-                        .clickable { onSelect(index) }
-                        .padding(vertical = Spacing.sm + Spacing.xxs),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = contentColor,
-                        maxLines = 1,
-                        softWrap = false
+            // Behind the labels, so the text stays legible while the pill slides under it.
+            Box(
+                modifier = Modifier
+                    .offset(x = pillOffset)
+                    .width(segmentWidth)
+                    .height(segmentHeight)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                options.forEachIndexed { index, label ->
+                    val selected = index == selectedIndex
+                    val contentColor by animateColorAsState(
+                        targetValue = if (selected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        animationSpec = tween(durationMillis = 180),
+                        label = "segment-content"
                     )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(segmentHeight)
+                            .clip(MaterialTheme.shapes.medium)
+                            .clickable { onSelect(index) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = contentColor,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
                 }
             }
         }
