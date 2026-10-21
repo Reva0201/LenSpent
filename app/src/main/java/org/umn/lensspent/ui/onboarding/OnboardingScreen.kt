@@ -41,9 +41,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.ImeAction
@@ -335,6 +338,8 @@ private fun ProfilePage(
     // Only unreadable text blocks the button, and clearing the field always clears that, so this can
     // never strand the user on this page - it just refuses to throw a number away.
     val budgetIsReadable = monthlyBudgetIdr != null
+    val usernameFocus = remember { FocusRequester() }
+    val budgetFocus = remember { FocusRequester() }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -394,8 +399,15 @@ private fun ProfilePage(
                 keyboardOptions = KeyboardOptions(
                     imeAction = ImeAction.Next
                 ),
+                // "Next" has to actually move: the key was declared but nothing listened to it, so
+                // pressing it left the caret in the name field and the budget then arrived there.
+                keyboardActions = KeyboardActions(
+                    onNext = { budgetFocus.requestFocus() }
+                ),
                 shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(usernameFocus)
             )
 
             OutlinedTextField(
@@ -431,7 +443,9 @@ private fun ProfilePage(
                     onDone = { if (budgetIsReadable) onStartTracking() }
                 ),
                 shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(budgetFocus)
             )
         }
 
