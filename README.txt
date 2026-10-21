@@ -191,7 +191,38 @@ Record on a freshly installed APK so the sample data is visible.
            the theme is a full colour scheme, not a tint.
 4:50-5:00  Close. One line on what you would build next (edit/edit-existing, real OCR).
 
-Screenshots for the report are in docs/screenshots/.
+Screenshots for the report are in docs/screenshots/, in the order they appear in the
+video script:
+
+  onboarding.png            first launch, step 1 (brand band + privacy promises)
+  profile.png               first launch, step 2 (name + budget, both optional)
+  home.png                  LIST screen: monthly hero, week chart, ledger
+  detail.png                DETAIL screen opened with a transaction id
+  form-empty.png            FORM screen, empty
+  form-error.png            FORM screen, numeric validation rejecting "45rb"
+  form-ready.png            FORM screen, valid and ready to save
+  form-keyboard.png         FORM screen, save bar riding above the IME
+  confirm-expense.png       receipt confirmation (camera path)
+  saved-dialog.png          saved confirmation card
+  trends-daily.png          free-choice screen, Daily compartment
+  trends-weekly.png         free-choice screen, Weekly chart
+  trends-categories.png     free-choice screen, ranked category breakdown
+  settings.png              profile, budget, theme, export
+  camera.png                native-feature screen: viewfinder, shutter, gallery
+  home-dark.png             dark theme
+  saved-dialog.png          confirmation card after a save
+
+Where each rubric criterion is visible:
+
+  Screens          home.png, detail.png, form-*.png, camera.png, trends-*.png
+  Theming          home.png vs home-dark.png, settings.png
+  State            form-empty -> form-error -> form-ready, saved-dialog.png,
+                   trends-daily.png (two stat cards filled from stored rows)
+  Navigation       detail.png was opened from a list row with an id argument;
+                   form-ready.png is the edit route for that same row
+  Validation       form-error.png (isError + supporting text, Save disabled)
+  Dummy data       home.png, trends-categories.png, all-transactions list
+
 
 
 9. NOTES FOR THE GRADER
