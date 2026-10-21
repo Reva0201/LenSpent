@@ -11,6 +11,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -280,7 +281,14 @@ fun SegmentedTabs(
                             .weight(1f)
                             .height(segmentHeight)
                             .clip(MaterialTheme.shapes.medium)
-                            .clickable { onSelect(index) },
+                            // No ripple and no hover state layer. The pill arriving is the feedback; a
+                            // second grey wash under the label only fights it, and with a pointer
+                            // resting on the control (an emulator, a desktop-mode window, a stylus) the
+                            // hover layer stays put as a grey block that looks like a bug.
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { onSelect(index) },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
