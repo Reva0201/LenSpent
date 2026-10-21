@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.umn.lensspent.data.model.Transaction
-import org.umn.lensspent.ui.theme.Elevation
 import org.umn.lensspent.ui.theme.LocalHeroColors
 import org.umn.lensspent.ui.theme.Sizes
 import org.umn.lensspent.ui.theme.Spacing
@@ -406,7 +405,7 @@ private fun DeleteConfirmationDialog(
         title = { Text("Delete this expense?") },
         text = {
             Text(
-                text = "${transaction.merchant} · ${formatIDR(transaction.amount)} will be " +
+                text = "${transaction.merchant} Â· ${formatIDR(transaction.amount)} will be " +
                     "removed from your ledger. This cannot be undone."
             )
         },

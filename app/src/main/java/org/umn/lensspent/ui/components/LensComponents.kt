@@ -48,6 +48,7 @@ import org.umn.lensspent.categoryIcon
 import org.umn.lensspent.data.model.Category
 import org.umn.lensspent.formatIDR
 import org.umn.lensspent.ui.theme.CategoryPalette
+import org.umn.lensspent.ui.theme.Elevation
 import org.umn.lensspent.ui.theme.Spacing
 
 /**
@@ -120,7 +121,7 @@ fun LensCard(
             // One soft ambient layer under the hairline. The border defines the edge; the shadow only
             // suggests that the card is above the paper, which is the difference between "a rectangle
             // drawn on the page" and "a surface resting on it".
-            shadowElevation = 2.dp
+            shadowElevation = Elevation.card
         ) {
             Column(content = content)
         }
@@ -131,7 +132,7 @@ fun LensCard(
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surface,
             border = border,
-            shadowElevation = 2.dp
+            shadowElevation = Elevation.card
         ) {
             Column(content = content)
         }
@@ -465,3 +466,4 @@ fun SectionHeader(
         action?.invoke()
     }
 }
+

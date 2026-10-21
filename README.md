@@ -173,12 +173,12 @@ adb shell am instrument -w -e class org.umn.lensspent.SaveConfirmationDialogTest
 
 | Nama | NIM | Bagian |
 | --- | --- | --- |
-| Muhammad Meccapareva | 000001113059 | Arsitektur, pipeline OCR dan kamera, Room, dashboard, form buat/ubah, data contoh |
+| Muhammad Meccapareva | 000001113059 | Arsitektur, pipeline OCR dan kamera, Room, dashboard, form buat/ubah, tema, detail, onboarding, pengaturan, AI Insights, data contoh, video demo |
 | Christian Kaliman | 00000105460 | Layar Trends: pager, grafik, kompartemen kategori |
 | Faturachman Al Kahfi | 00000075344 | Layar kamera: viewfinder, shutter, galeri, izin |
-| Clarence Bradlee Gosal | 00000137487 | Sistem desain, komponen bersama, ikon launcher, tema gelap |
-| Ezequiel Emeraldo | 00000159857 | Onboarding, pengaturan, ekspor CSV, AI Insights |
-| Farell Timothy | 00000108839 | Pengujian, verifikasi data, dokumentasi, video demo |
+| Clarence Bradlee Gosal | 00000137487 | Uji coba tampilan di beberapa ukuran layar, masukan desain |
+| Ezequiel Emeraldo | 00000159857 | Bantuan aset dan pengecekan alur onboarding serta pengaturan |
+| Farell Timothy | 00000108839 | Bantuan pengujian manual dan pencatatan temuan |
 
 ## Lisensi
 

@@ -222,7 +222,7 @@ internal fun SaveConfirmationDialog(saved: SavedExpense, onDismiss: () -> Unit) 
                 },
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 12.dp
+            shadowElevation = Elevation.modal
         ) {
             Column(
                 modifier = Modifier.padding(Spacing.xxl),

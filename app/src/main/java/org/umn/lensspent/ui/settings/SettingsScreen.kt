@@ -200,7 +200,7 @@ private fun SettingsCard(content: @Composable () -> Unit) {
             width = 1.dp,
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
         ),
-        shadowElevation = 2.dp
+        shadowElevation = Elevation.card
     ) {
         Column(modifier = Modifier.padding(vertical = Spacing.xs)) {
             content()

@@ -46,14 +46,13 @@ object Spacing {
 
 /**
  * Elevation is used sparingly: the app is drawn with surface colours rather than shadows, because a
- * shadow on a near-black background in dark mode does nothing but band. These four steps cover the
- * cases where a surface genuinely floats - a card, the nav bar, the FAB, a dialog.
+ * shadow on a near-black background in dark mode does nothing but band. These steps cover the cases
+ * where a surface genuinely floats - a card, the action dock, a dialog.
  */
 object Elevation {
-    val flat = 0.dp
     val raised = 1.dp
     val card = 2.dp
-    val floating = 6.dp
+    val floating = 8.dp
     val modal = 12.dp
 }
 
@@ -68,12 +67,8 @@ object Sizes {
     val icon = 24.dp
     val iconLarge = 32.dp
 
-    /** The floating action button: larger than Material's 56dp so it reads as the app's one main action. */
-    val fab = 64.dp
-
     /**
-     * Bottom padding that lets the last list row clear a docked FAB at [fab], including the part of it
-     * that hangs below the navigation bar.
+     * The floating action button: larger than Material's 56dp so it reads as the app's one main action.
      */
-    val fabClearance = 104.dp
+    val fab = 64.dp
 }
