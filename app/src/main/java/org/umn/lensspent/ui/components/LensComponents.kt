@@ -2,6 +2,7 @@ package org.umn.lensspent.ui.components
 
 import android.graphics.Color as AndroidColor
 import android.animation.ValueAnimator
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -28,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -200,6 +202,83 @@ fun CategoryTilePicker(
                     maxLines = 1,
                     textAlign = TextAlign.Center
                 )
+            }
+        }
+    }
+}
+
+/**
+ * A segmented switcher: one track, and the selected segment as a raised pill inside it.
+ *
+ * The Material tab row underneath this screen was a line of text with an underscore that moved - a
+ * control that says "these are tabs" without saying anything about which one is chosen beyond 2dp of
+ * colour. A pill on a recessed track shows the selection as an object, and the sliding background
+ * animates so a swipe of the pager and a tap on the segment look like the same event.
+ *
+ * Four options is the practical maximum for this shape on a phone: past that, the labels stop fitting
+ * on one line and the control becomes a scrollable list of buttons.
+ */
+@Composable
+fun SegmentedTabs(
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(Spacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            options.forEachIndexed { index, label ->
+                val selected = index == selectedIndex
+                // The selected segment is filled with the brand container rather than white-on-white:
+                // a white pill inside a white track is only legible through its shadow, which is
+                // exactly what made the first version of this control read as grey smudge.
+                val container by animateColorAsState(
+                    targetValue = if (selected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        Color.Transparent
+                    },
+                    animationSpec = tween(durationMillis = 180),
+                    label = "segment-container"
+                )
+                val contentColor by animateColorAsState(
+                    targetValue = if (selected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    animationSpec = tween(durationMillis = 180),
+                    label = "segment-content"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(container)
+                        .clickable { onSelect(index) }
+                        .padding(vertical = Spacing.sm + Spacing.xxs),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = contentColor,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
             }
         }
     }

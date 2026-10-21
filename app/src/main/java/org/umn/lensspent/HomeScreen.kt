@@ -523,7 +523,7 @@ private fun SpendingOverviewCard(
                 IconButton(onClick = onOpenAnalytics) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = "Open analytics",
+                        contentDescription = "Open trends",
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }

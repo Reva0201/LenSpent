@@ -75,9 +75,10 @@ layout, budget hero, week chart wiring" is specific and checkable.
    not a crash. The screen is a UI mockup (the exam allows dummy behaviour); no OCR result
    is required to demonstrate it.
 
-5. FREE CHOICE — AnalyticsScreen.kt
-   Daily / Weekly / Yearly tabs in a HorizontalPager, date steppers, the shared bar chart,
-   and a history sheet listing the transactions for the selected period.
+5. FREE CHOICE — AnalyticsScreen.kt ("Trends")
+   Daily / Weekly / Yearly / Categories compartments in a HorizontalPager, date
+   steppers, the shared bar chart, a ranked category breakdown with share bars,
+   and the full transaction list beneath.
 
 Supporting screens (not counted in the five): OnboardingScreen (agreement + profile),
 AiChatScreen (premium AI insights), SettingsScreen (name, budget, theme, CSV export).
@@ -183,8 +184,9 @@ Record on a freshly installed APK so the sample data is visible.
            Save becoming enabled. Save, and show the new row on the dashboard.
 3:20-3:50  NATIVE SCREEN. Tap "Scan receipt": viewfinder, shutter, gallery import, lens
            flip, framing tips, and the permission-denied state.
-3:50-4:30  ANALYTICS (free choice). Daily/Weekly/Yearly tabs, step through dates, note
-           that the numbers match the dashboard.
+3:50-4:30  TRENDS (free choice). Daily/Weekly/Yearly/Categories compartments, step through
+           dates, note that the numbers match the dashboard, then show the ranked category
+           breakdown.
 4:30-4:50  THEME. Settings -> Light / Dark. Show the same screens in dark mode to prove
            the theme is a full colour scheme, not a tint.
 4:50-5:00  Close. One line on what you would build next (edit/edit-existing, real OCR).

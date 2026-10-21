@@ -52,11 +52,16 @@ import org.umn.lensspent.data.SpendingAggregator
 import org.umn.lensspent.data.model.Transaction
 import org.umn.lensspent.ui.components.CategoryBadge
 import org.umn.lensspent.ui.components.CategoryShareRow
+import org.umn.lensspent.ui.components.SegmentedTabs
 import org.umn.lensspent.ui.theme.Spacing
 
 private val AnalyticsTabs = listOf("Daily", "Weekly", "Yearly", "Categories")
 
-private const val HistoryTitle = "History Spending"
+/**
+ * The sheet lists the whole ledger, not the selected compartment, so it is titled for what it is
+ * rather than for the period above it. "History Spending" was neither one thing nor the other.
+ */
+private const val HistoryTitle = "All transactions"
 
 /** "11-09-2026 - 18-09-2026": the week the stepper is currently on, Monday through Sunday. */
 private fun weekRangeLabel(weekStart: LocalDate): String =
@@ -119,8 +124,12 @@ fun AnalyticsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Spending Analytics",
-                        fontWeight = FontWeight.Bold
+                        // "Trends" rather than "Spending Analytics": the screen answers "how is this
+                        // going over time" and "where did it go", which is trends and breakdown, not
+                        // statistics. It is also short enough to sit next to the back arrow without
+                        // reading like a report heading.
+                        text = "Trends",
+                        style = MaterialTheme.typography.titleLarge
                     )
                 },
                 navigationIcon = {
@@ -141,31 +150,21 @@ fun AnalyticsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Tab selection is driven by the pager, so swiping and tapping stay in sync
-            PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
-                AnalyticsTabs.forEachIndexed { index, title ->
-                    val selected = pagerState.currentPage == index
-                    Tab(
-                        selected = selected,
-                        onClick = {
-                            scope.launch {
-                                pagerState.animateScrollToPage(index)
-                            }
-                        },
-                        text = {
-                            // One line, never wrapped: four tabs on a phone leave about 80dp each, and
-                            // "Categories" at body size broke onto two lines and pushed the indicator
-                            // off the tab row.
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
-                    )
-                }
-            }
+            // A pill switcher instead of a tab row: the selection is an object on a recessed track,
+            // and it sits in the gutter with the content rather than spanning the screen edge to edge.
+            SegmentedTabs(
+                options = AnalyticsTabs,
+                selectedIndex = pagerState.currentPage,
+                onSelect = { index ->
+                    scope.launch { pagerState.animateScrollToPage(index) }
+                },
+                modifier = Modifier.padding(
+                    start = AnalyticsDimens.Gutter,
+                    end = AnalyticsDimens.Gutter,
+                    top = AnalyticsDimens.VerticalGap,
+                    bottom = AnalyticsDimens.VerticalGap
+                )
+            )
 
             HorizontalPager(
                 state = pagerState,
