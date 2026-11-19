@@ -1,5 +1,6 @@
 package org.umn.lensspent
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -45,7 +47,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.umn.lensspent.data.model.Category
 import org.umn.lensspent.ui.components.CategoryTilePicker
-import org.umn.lensspent.ui.theme.Elevation
 import org.umn.lensspent.ui.theme.Sizes
 import org.umn.lensspent.ui.theme.Spacing
 
@@ -109,15 +110,11 @@ fun AddExpenseScreen(
             // you have to hunt for is a form people abandon.
             Surface(
                 color = MaterialTheme.colorScheme.surface,
-                shadowElevation = Elevation.floating
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        // The bar has to ride above the keyboard: a sticky action that the IME covers
-                        // is no better than one at the end of the form. The navigation-bar inset is
-                        // handled inside the same modifier chain, once, so the button never sits under
-                        // either system surface.
                         .navigationBarsPadding()
                         .imePadding()
                         .padding(horizontal = Spacing.xl, vertical = Spacing.md),
@@ -138,8 +135,8 @@ fun AddExpenseScreen(
                         enabled = uiState.canSave,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp),
-                        shape = MaterialTheme.shapes.large
+                            .heightIn(min = 52.dp),
+                        shape = MaterialTheme.shapes.medium
                     ) {
                         if (uiState.isSaving) {
                             CircularProgressIndicator(
@@ -170,7 +167,7 @@ fun AddExpenseScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.xl, vertical = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xxl)
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl)
         ) {
             AmountField(
                 uiState = uiState,
@@ -198,7 +195,7 @@ fun AddExpenseScreen(
                 onNoteChange = viewModel::onNoteChange
             )
 
-            Spacer(modifier = Modifier.height(Spacing.xxl))
+            Spacer(modifier = Modifier.height(Spacing.xl))
         }
     }
 }
@@ -242,7 +239,7 @@ private fun AmountField(
             imeAction = ImeAction.Done
         ),
         keyboardActions = KeyboardActions(onDone = { onDone() }),
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.small,
         modifier = Modifier.fillMaxWidth()
     )
 }
@@ -280,7 +277,7 @@ private fun MerchantField(
             keyboardType = KeyboardType.Text,
             imeAction = ImeAction.Next
         ),
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.small,
         modifier = Modifier.fillMaxWidth()
     )
 }
@@ -370,7 +367,7 @@ private fun NoteField(
             keyboardType = KeyboardType.Text,
             imeAction = ImeAction.Default
         ),
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.small,
         modifier = Modifier.fillMaxWidth()
     )
 }

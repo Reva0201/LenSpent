@@ -1,6 +1,5 @@
 package org.umn.lensspent.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -9,29 +8,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+import android.os.Build
 
 /**
- * The gradient the two hero cards are painted with, resolved by the theme.
+ * Whether the app is currently drawing its dark scheme.
  *
- * Kept as a composition local rather than a parameter so a screen asks for "the brand gradient" and
- * gets whichever pair belongs to the scheme currently on screen - see [HeroColors] for why the
- * gradient cannot simply be built from `colorScheme` roles.
+ * Category colours are data, not tokens, but they still have to be lifted for a dark surface. Reading
+ * the *system* setting for that was wrong whenever the user forced Light or Dark in Settings: the app
+ * would paint a light page and brighten its category tints as if it were night, or the reverse. This
+ * local answers the question the screen actually asks - which scheme is on screen - so every category
+ * badge follows the same decision as the page behind it.
  */
-val LocalHeroColors = staticCompositionLocalOf { LightHeroColors }
+val LocalLensDarkTheme = staticCompositionLocalOf { false }
 
 /**
  * The app's theme: LensSpent's own colours, type scale and shapes, applied once here.
  *
- * All three systems are supplied. Passing only `colorScheme` - which is what the project did before -
- * leaves `MaterialTheme.shapes` and `MaterialTheme.typography` at Material's defaults, so every screen
- * that asked the theme for a shape silently got 4/8/12dp corners, and the custom colours were the only
- * thing that was actually custom. The rubric asks for a theme with colours, typography *and* shapes, and
- * more to the point a half-applied theme is what makes cards built a week apart look unrelated.
+ * All three systems are supplied. Passing only `colorScheme` leaves `MaterialTheme.shapes` and
+ * `MaterialTheme.typography` at Material's defaults, so every screen that asked the theme for a shape
+ * silently got different corners from its neighbour.
  *
  * `dynamicColor` is off by default, and off for a reason. Material You replaces the whole colour scheme
- * with the wallpaper's, which would erase the palette the app is branded with and leave the teal
- * "money left" accent meaning nothing. It stays a parameter so a developer can preview the app under
- * the device palette, not so it can be turned on in a build.
+ * with the wallpaper's, which would erase the palette the app is branded with and leave the olive
+ * "budget" colour meaning nothing. It stays a parameter so a developer can preview the app under the
+ * device palette, not so it can be turned on in a build.
  *
  * [darkTheme] is a boolean rather than "read the system" because the user can force Light or Dark in
  * Settings; the decision is made once in `MainActivity` and handed in, so the theme never has to guess.
@@ -57,10 +57,8 @@ fun LensSpentTheme(
         typography = LensSpentTypography,
         shapes = LensSpentShapes,
         content = {
-            // Provided inside MaterialTheme so the gradient's content colour can be read next to the
-            // scheme it belongs to, and so a preview that overrides the theme cannot leave a stale one.
             CompositionLocalProvider(
-                LocalHeroColors provides if (darkTheme) DarkHeroColors else LightHeroColors,
+                LocalLensDarkTheme provides darkTheme,
                 content = content
             )
         }

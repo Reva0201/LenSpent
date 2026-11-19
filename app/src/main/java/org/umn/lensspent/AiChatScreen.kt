@@ -1,4 +1,4 @@
-package org.umn.lensspent
+﻿package org.umn.lensspent
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -30,6 +31,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -76,14 +78,16 @@ private val AssistantBubbleShape = RoundedCornerShape(
 )
 
 /**
- * Premium AI Insights: a chat over the same ledger the dashboard shows.
+ * AI Insights: a chat over aggregate spending totals derived from the same ledger the dashboard
+ * shows.
  *
  * The screen is deliberately plain - a transcript, an input and the disclaimer - because everything
  * interesting happens one layer down in [AiChatViewModel] and the repository behind it. Answers are
  * drawn by [MarkdownText], so bold and bullets come out as bold and bullets.
  *
- * The disclaimer under the input is neither dismissible nor conditional: it is the last thing on the
- * screen in every state, including before the first question is asked.
+ * Two things are shown before anything can be sent: the availability notice (when this build has no
+ * backend, or the user switched AI off) and the one-time disclosure. The disclaimer under the input is
+ * neither dismissible nor conditional.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,6 +105,13 @@ fun AiChatScreen(
         if (newestIndex >= 0) listState.animateScrollToItem(newestIndex)
     }
 
+    if (uiState.isShowingDisclosure) {
+        AiPrivacyDisclosureDialog(
+            onDismiss = viewModel::onDismissDisclosure,
+            onAccept = viewModel::onConsentAccepted
+        )
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -113,7 +124,7 @@ fun AiChatScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Powered by DeepSeek",
+                            text = "Optional · sends your question and monthly totals",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -150,13 +161,20 @@ fun AiChatScreen(
                 }
             }
 
-            // Lifted with the keyboard, and always below the transcript: the input, then the
-            // disclaimer the feature has to state.
+            // Lifted with the keyboard, and always below the transcript: the availability notice (if
+            // any), the input, then the disclaimer the feature has to state.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .imePadding()
             ) {
+                uiState.availability.notice?.let { notice ->
+                    AiAvailabilityNote(
+                        notice = notice,
+                        needsConsent = uiState.availability.needsConsent,
+                        onReviewDisclosure = viewModel::onShowDisclosure
+                    )
+                }
                 AiChatInputRow(
                     draft = uiState.draft,
                     canSend = uiState.canSend,
@@ -189,7 +207,7 @@ private fun AiChatBubble(message: AiChatMessage) {
             color = when {
                 fromUser -> MaterialTheme.colorScheme.primary
                 message.isError -> MaterialTheme.colorScheme.errorContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
+                else -> MaterialTheme.colorScheme.surfaceContainerLow
             }
         ) {
             Box(
@@ -223,7 +241,7 @@ private fun AiChatBubble(message: AiChatMessage) {
 @Composable
 private fun AwaitingReplyBubble() {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-        Surface(shape = AssistantBubbleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
+        Surface(shape = AssistantBubbleShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
             Row(
                 modifier = Modifier.padding(AiChatDimens.BubblePadding),
                 verticalAlignment = Alignment.CenterVertically,
@@ -304,4 +322,74 @@ private fun AiDisclaimerNote() {
             )
     )
 }
+
+/**
+ * Why the feature cannot send right now, directly above the input it explains.
+ *
+ * This is the "clear message when AI is unavailable" requirement: a person who opens the screen on a
+ * build with no backend reads that the feature is off and why, instead of typing a question into a
+ * button that never enables.
+ */
+@Composable
+private fun AiAvailabilityNote(
+    notice: String,
+    needsConsent: Boolean,
+    onReviewDisclosure: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AiChatDimens.Gutter, vertical = AiChatDimens.InputSpacing),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(
+            modifier = Modifier.padding(AiChatDimens.BubblePadding),
+            verticalArrangement = Arrangement.spacedBy(AiChatDimens.InputSpacing)
+        ) {
+            Text(
+                text = notice,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (needsConsent) {
+                TextButton(onClick = onReviewDisclosure) {
+                    Text(text = "Review what is sent")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The explicit opt-in.
+ *
+ * Not dismissible by tapping outside: accepting or declining are both explicit choices, and declining
+ * simply closes the dialog with the feature still off. Every line comes from
+ * [AiPrivacyDisclosureLines], which is what a test asserts against.
+ */
+@Composable
+internal fun AiPrivacyDisclosureDialog(
+    onDismiss: () -> Unit,
+    onAccept: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = AiPrivacyDisclosureTitle) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(AiChatDimens.InputSpacing)) {
+                AiPrivacyDisclosureLines.forEach { line ->
+                    Text(text = "â€¢  $line", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onAccept) { Text(text = "I understand, enable AI") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(text = "Not now") }
+        }
+    )
+}
+
 

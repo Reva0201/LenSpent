@@ -193,13 +193,22 @@ class AddExpenseViewModel(
         val categoryId = state.selectedCategoryId ?: return
         val category = state.categories.firstOrNull { it.id == categoryId } ?: return
         val note = state.note.trim().takeIf { it.isNotEmpty() }
-        // Noon on the chosen day: the row has a date the user picked and no meaningful time, and noon
-        // is the one time that cannot slide across a DST boundary.
-        val occurredAt = state.selectedDate
-            .atTime(LocalTime.NOON)
-            .atZone(clock.zone)
-            .toInstant()
-            .toEpochMilli()
+        // Rows are ordered by occurredAt, so a manual entry has to carry a time of its own. Noon was
+        // the first choice for being DST-safe, but it sorted a new expense into the middle of the day:
+        // demo receipts run 09:30-19:30, so "Valorant, just added" appeared under Indomaret. A new line
+        // now takes the current time on the chosen day, which is also what the user means by "now".
+        val now = clock.instant().atZone(clock.zone)
+        val occurredAt = if (state.selectedDate == today) {
+            now.toInstant().toEpochMilli()
+        } else {
+            // Backdating keeps the same clock time, so two entries made on the same past day stay in
+            // the order they were typed.
+            state.selectedDate
+                .atTime(now.toLocalTime())
+                .atZone(clock.zone)
+                .toInstant()
+                .toEpochMilli()
+        }
 
         val existing = editing
         _uiState.update { it.copy(isSaving = true) }
@@ -229,8 +238,10 @@ class AddExpenseViewModel(
                 }
                 _saved.value = true
             } catch (e: Exception) {
-                // Keep every field as the user left it so the save can simply be retried.
-                e.printStackTrace()
+                // Keep every field as the user left it so the save can simply be retried. The
+                // exception can quote a row's contents, so only the type is recorded, and only in
+                // debug builds.
+                AppLog.warn("saving an expense failed", e)
                 _uiState.update { it.copy(isSaving = false) }
             }
         }

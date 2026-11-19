@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <!--
       The window background is the app's own paper colour rather than the platform default, so the first
@@ -11,6 +11,10 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <!--
+          windowLightNavigationBar was added in API 27. The app draws its own edge-to-edge bars from
+          MainActivity, so on API 26 this attribute is simply absent rather than wrong.
+        -->
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
     </style>
 </resources>

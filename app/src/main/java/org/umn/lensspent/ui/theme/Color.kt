@@ -5,189 +5,136 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 /**
- * LensSpent's palette: deep ocean ink carrying the app, a single teal accent for what the user should
- * act on, and cool neutrals for everything that is merely information.
+ * LensSpent's palette: warm paper, olive ink, and one ochre accent.
  *
- * Two rules keep this a system rather than a bag of hex codes. First, every role is named for what it
- * means in this app - `primary` is the ink of a headline and the fill of the main button, `tertiary` is
- * the one colour allowed to mean "money you have left". Second, each role exists in both schemes and
- * is picked in pairs, so nothing ever needs a hand-tuned alpha to stay readable in dark mode.
+ * The previous palette was a blue-led finance palette: deep ocean ink, teal for money left, cool
+ * blue-grey neutrals. It read clearly, but it also read like every other banking app, and the blue
+ * gradient card made the dashboard's most important number look like a marketing panel rather than a
+ * ledger total.
  *
- * The raw colours are private: a screen that reaches past the colour scheme is the drift this file
- * exists to prevent. What a screen may use is `MaterialTheme.colorScheme`, which is what makes a
- * theme switch a single line rather than an audit.
+ * This palette is drawn from the material the app is about: paper receipts, a pencil ledger, and the
+ * green ink a shopkeeper uses to mark a total. The page is warm off-white rather than blue-white, the
+ * ink is a dark olive rather than navy, and the one saturated colour is a deep olive used for actions
+ * and budget progress. Ochre is the supporting accent and is kept to small marks: a category icon, a
+ * selected state, a single figure that needs to be noticed.
+ *
+ * The rules are the same as before, because they are what keep this a system rather than a bag of hex
+ * codes. Every role is named for what it means in this app, each role exists in both schemes, and the
+ * raw colours are private so a screen cannot reach past the scheme. What a screen may use is
+ * `MaterialTheme.colorScheme`.
  */
-private val Ink900 = Color(0xFF05121A)
-private val Ink800 = Color(0xFF0B1418)
-private val Ink700 = Color(0xFF0D5C8A)
-private val Ink600 = Color(0xFF0A4A70)
-private val Ink200 = Color(0xFF8CCBF0)
-private val Ink100 = Color(0xFFCBE8FB)
-private val Ink50 = Color(0xFFD3E8F7)
 
-private val Teal700 = Color(0xFF0A8A7E)
-private val Teal600 = Color(0xFF00776C)
-private val Teal200 = Color(0xFF5FD8CB)
-private val Teal50 = Color(0xFFC7F0E9)
-
-private val Slate800 = Color(0xFF3E5B6E)
-private val Slate300 = Color(0xFFB4C9D6)
-private val Slate100 = Color(0xFFDBE6ED)
-private val Slate900 = Color(0xFF0C1A22)
-
-private val Paper = Color(0xFFF5F8FA)
+// Paper and ink, light scheme.
+private val Paper = Color(0xFFF7F5EF)
 private val PaperRaised = Color(0xFFFFFFFF)
-private val PaperSunk = Color(0xFFE9F0F4)
+private val PaperSunk = Color(0xFFEAE7DD)
+private val PaperRaisedHigh = Color(0xFFE2DFD3)
+private val PaperHighest = Color(0xFFDAD6C8)
+private val Ink = Color(0xFF202820)
+private val InkMuted = Color(0xFF515B50)
+private val Rule = Color(0xFFD5D5C7)
+private val RuleStrong = Color(0xFF727A69)
 
-/**
- * The dark scheme's spine: warm-neutral charcoal rather than blue-black.
- *
- * The first dark palette was `#080E12` - near-black with a blue cast. It looked fine in isolation and
- * wrong on a real screen: against a phone's own black bezel and status bar the page read as a hole, and
- * the blue tint made every card look like a slightly different shade of the background. These values are
- * a touch lighter and almost neutral, with the blue kept to a hint rather than a cast. That is what lets
- * a card at `NightRaised` be legibly *above* the page instead of a rectangle you have to hunt for.
- */
-private val Night = Color(0xFF101418)
-private val NightRaised = Color(0xFF181D22)
-private val NightSunk = Color(0xFF1D2329)
+// Olive: actions, budget progress, the app's one strong colour.
+private val Olive800 = Color(0xFF425832)
+private val Olive900 = Color(0xFF2C3D20)
+private val Olive100 = Color(0xFFDCE9CF)
+private val Olive50 = Color(0xFFEDF3E5)
+
+// Ochre: a supporting accent, never body text or a large fill.
+private val Ochre800 = Color(0xFF866019)
+private val Ochre100 = Color(0xFFF5E3BB)
+
+// Warm charcoal for the dark scheme. Not blue-black: against a phone's own bezel a blue-black page
+// reads as a hole, and the warm cast keeps receipts and paper imagery feeling like the same app.
+private val Night = Color(0xFF141813)
+private val NightRaised = Color(0xFF20271D)
+private val NightSunk = Color(0xFF2A3226)
+private val NightHigh = Color(0xFF323A2D)
+private val NightHighest = Color(0xFF3B4435)
+private val NightInk = Color(0xFFEDF1E8)
+private val NightInkMuted = Color(0xFFBFC7B8)
+private val NightRule = Color(0xFF4B5545)
 
 private val Red600 = Color(0xFFB3261E)
 private val Red300 = Color(0xFFFFB4AB)
 private val Red900 = Color(0xFF410E0B)
 private val Red950 = Color(0xFF690005)
 
-/**
- * The brand gradient's own colours, with the colour its content must be drawn in.
- *
- * This exists because a gradient cannot be assembled out of `colorScheme` slots and still work in both
- * modes. In the light scheme `primary` and `tertiary` are deep inks, so a primary-to-tertiary gradient
- * with white text reads correctly - but in the dark scheme those same slots are *light* tints, and the
- * identical gradient turns into a pastel block with white text on it, which is unreadable. Naming the
- * gradient as its own role lets each scheme choose a pair that its own content colour contrasts with,
- * instead of every screen inventing one and half of them getting dark mode wrong.
- */
-data class HeroColors(
-    val start: Color,
-    val end: Color,
-    /** Text and icons drawn directly on the gradient. */
-    val content: Color,
-    /** Secondary text on the gradient: labels, units, supporting lines. */
-    val contentMuted: Color,
-    /** The one accent allowed on the hero: the ring that shows budget used. */
-    val accent: Color
-)
-
-/**
- * A rich brand-blue card on the light page.
- *
- * Two earlier attempts are worth recording, because both failed the same way. The first swept brand
- * blue into brand teal, and the hue crossing produced a green that belongs to neither. The second went
- * so dark that on a white page it read as black - a hole rather than a coloured surface - and its
- * diagonal made the amount sit on a noticeably lighter patch than the label above it.
- *
- * So: one family, clearly blue, and a vertical sweep with a small delta, which keeps the amount and the
- * footer on the same tone and lets the lightening be read as depth at the bottom edge.
- */
-internal val LightHeroColors = HeroColors(
-    start = Color(0xFF11496F),
-    end = Color(0xFF0B3352),
-    content = Color.White,
-    contentMuted = Color.White.copy(alpha = 0.76f),
-    accent = Color(0xFF5FD8CB)
-)
-
-/**
- * The same family in dark mode, lifted just above the background: the hero still has to be a different
- * surface from the page, so it is lighter than `background`, not darker.
- */
-internal val DarkHeroColors = HeroColors(
-    start = Color(0xFF1B3B52),
-    end = Color(0xFF142B3D),
-    content = Color(0xFFE6F1F7),
-    contentMuted = Color(0xFFE6F1F7).copy(alpha = 0.72f),
-    accent = Color(0xFF5FD8CB)
-)
-
 internal val LensSpentLightColors = lightColorScheme(
-    primary = Ink700,
+    primary = Olive800,
     onPrimary = Color.White,
-    primaryContainer = Ink50,
-    onPrimaryContainer = Color(0xFF04202E),
-    inversePrimary = Ink200,
-    secondary = Slate800,
+    primaryContainer = Olive100,
+    onPrimaryContainer = Color(0xFF17210F),
+    inversePrimary = Color(0xFFB9D39D),
+    secondary = Color(0xFF5C6652),
     onSecondary = Color.White,
-    secondaryContainer = Slate100,
-    onSecondaryContainer = Slate900,
-    tertiary = Teal700,
+    secondaryContainer = Color(0xFFE0E8D8),
+    onSecondaryContainer = Color(0xFF1A2115),
+    tertiary = Ochre800,
     onTertiary = Color.White,
-    tertiaryContainer = Teal50,
-    onTertiaryContainer = Color(0xFF002E29),
+    tertiaryContainer = Ochre100,
+    onTertiaryContainer = Color(0xFF2C1F00),
     error = Red600,
     onError = Color.White,
     errorContainer = Color(0xFFF9DEDC),
     onErrorContainer = Red900,
     background = Paper,
-    onBackground = Ink800,
+    onBackground = Ink,
     surface = PaperRaised,
-    onSurface = Ink800,
-    surfaceVariant = Color(0xFFE2EAEF),
-    onSurfaceVariant = Color(0xFF40525C),
-    surfaceTint = Ink700,
-    inverseSurface = Color(0xFF21313A),
-    inverseOnSurface = Color(0xFFECF3F6),
-    outline = Color(0xFF6E7F89),
-    outlineVariant = Color(0xFFC6D2D9),
+    onSurface = Ink,
+    surfaceVariant = Color(0xFFE8E6DC),
+    onSurfaceVariant = InkMuted,
+    surfaceTint = Olive800,
+    inverseSurface = Color(0xFF263022),
+    inverseOnSurface = Color(0xFFF1F4EA),
+    outline = RuleStrong,
+    outlineVariant = Rule,
     scrim = Color.Black,
     surfaceBright = Color.White,
-    surfaceDim = Color(0xFFDCE5EA),
+    surfaceDim = Color(0xFFE4E1D7),
     surfaceContainerLowest = Color.White,
-    surfaceContainerLow = Color(0xFFF0F5F8),
+    surfaceContainerLow = Color(0xFFF0EEE6),
     surfaceContainer = PaperSunk,
-    surfaceContainerHigh = Color(0xFFE2EAEF),
-    surfaceContainerHighest = Color(0xFFD8E2E8)
+    surfaceContainerHigh = PaperRaisedHigh,
+    surfaceContainerHighest = PaperHighest
 )
 
-/**
- * Dark scheme: near-black rather than grey, so a raised card reads as a lit surface and the teal accent
- * keeps its punch. Every `on*` role is a light tint of its container, which is what keeps long-form
- * text readable without per-screen overrides.
- */
 internal val LensSpentDarkColors = darkColorScheme(
-    primary = Ink200,
-    onPrimary = Color(0xFF00344D),
-    primaryContainer = Ink600,
-    onPrimaryContainer = Ink100,
-    inversePrimary = Ink700,
-    secondary = Slate300,
-    onSecondary = Color(0xFF1E333F),
-    secondaryContainer = Color(0xFF334A57),
-    onSecondaryContainer = Color(0xFFD0E3EF),
-    tertiary = Teal200,
-    onTertiary = Color(0xFF003730),
-    tertiaryContainer = Color(0xFF005049),
-    onTertiaryContainer = Color(0xFFB8F0E9),
+    primary = Color(0xFFB9D39D),
+    onPrimary = Color(0xFF233313),
+    primaryContainer = Color(0xFF35482A),
+    onPrimaryContainer = Color(0xFFD7EDC0),
+    inversePrimary = Olive800,
+    secondary = Color(0xFFC4CCB9),
+    onSecondary = Color(0xFF2E3628),
+    secondaryContainer = Color(0xFF444D3C),
+    onSecondaryContainer = Color(0xFFE0E8D8),
+    tertiary = Color(0xFFE6C06A),
+    onTertiary = Color(0xFF442F00),
+    tertiaryContainer = Color(0xFF624700),
+    onTertiaryContainer = Color(0xFFFFDF9E),
     error = Red300,
     onError = Red950,
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6),
     background = Night,
-    onBackground = Color(0xFFE3EAEF),
+    onBackground = NightInk,
     surface = NightRaised,
-    onSurface = Color(0xFFE3EAEF),
-    surfaceVariant = Color(0xFF24333C),
-    onSurfaceVariant = Color(0xFFB9C7D0),
-    surfaceTint = Ink200,
-    inverseSurface = Color(0xFFE3EAEF),
-    inverseOnSurface = Color(0xFF26343C),
-    outline = Color(0xFF83949E),
-    outlineVariant = Color(0xFF33434C),
+    onSurface = NightInk,
+    surfaceVariant = NightSunk,
+    onSurfaceVariant = NightInkMuted,
+    surfaceTint = Color(0xFFB9D39D),
+    inverseSurface = NightInk,
+    inverseOnSurface = Color(0xFF263022),
+    outline = Color(0xFF8E9885),
+    outlineVariant = NightRule,
     scrim = Color.Black,
-    surfaceBright = Color(0xFF2A3A44),
-    surfaceDim = Color(0xFF0C1013),
-    surfaceContainerLowest = Color(0xFF0A0E11),
-    surfaceContainerLow = Color(0xFF151A1F),
+    surfaceBright = NightHigh,
+    surfaceDim = Color(0xFF0E120E),
+    surfaceContainerLowest = Color(0xFF0F130F),
+    surfaceContainerLow = Color(0xFF1A2018),
     surfaceContainer = NightSunk,
-    surfaceContainerHigh = Color(0xFF232A31),
-    surfaceContainerHighest = Color(0xFF2C343C)
+    surfaceContainerHigh = NightHigh,
+    surfaceContainerHighest = NightHighest
 )

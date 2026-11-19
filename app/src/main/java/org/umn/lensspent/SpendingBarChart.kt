@@ -1,7 +1,6 @@
 package org.umn.lensspent
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -33,12 +32,18 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import org.umn.lensspent.ui.theme.Motion
+import org.umn.lensspent.ui.theme.motionTween
+import org.umn.lensspent.ui.theme.rememberAnimationsEnabled
 
 /**
  * Geometry tokens for the spending chart. Everything else (typography, colours, the tooltip pill
@@ -58,13 +63,11 @@ private object ChartDimens {
 /** Peak, 66 %, 33 % and the Rp 0 baseline. */
 private const val GridLevelCount = 4
 
-private val BarSpring = spring<Float>(dampingRatio = 0.6f, stiffness = 400f)
-
 /**
  * IDR grid-line bar chart shared by the dashboard and the analytics screen.
  *
  * The grid lines, their axis labels and the bar fills are painted in a single [Canvas] pass, and the
- * per-bar spring values are only read from the draw scope: animating heights therefore invalidates
+ * per-bar animated values are only read from the draw scope: animating heights therefore invalidates
  * drawing alone and never triggers composition or layout. A transparent interaction layer on top of
  * the canvas provides the ripple, the tap targets and the floating Rupiah tooltip.
  *
@@ -81,6 +84,7 @@ fun SpendingBarChart(
     barAreaHeight: Dp = ChartDimens.Height
 ) {
     var selectedBarIndex by remember(data) { mutableStateOf<Int?>(null) }
+    val animationsEnabled = rememberAnimationsEnabled()
 
     val maxVal = remember(data) { data.maxOrNull() ?: 1f }
 
@@ -94,20 +98,28 @@ fun SpendingBarChart(
         )
     }
 
-    // One spring per bar, read later from the draw phase and by the visible tooltip only.
+    // One animated fraction per bar, read later from the draw phase and by the visible tooltip only.
     // A period with nothing in it has no peak to scale against - every bucket is zero - so the
-    // fraction is pinned to zero rather than dividing by it: 0f/0f would be NaN, which no spring can
-    // settle on and which would place the tooltip at an undefined offset.
+    // fraction is pinned to zero rather than dividing by it: 0f/0f would be NaN, which no
+    // animation can settle on and which would place the tooltip at an undefined offset.
+    //
+    // It used to be a spring with dampingRatio 0.6, which overshot every bar before settling. On a
+    // chart that represents money, an overshoot momentarily shows a total that was never spent, so
+    // the scale now eases out without ever passing its target.
     val barFractions = data.map { amount ->
         animateFloatAsState(
             targetValue = if (maxVal > 0f) amount / maxVal else 0f,
-            animationSpec = BarSpring,
+            animationSpec = motionTween(Motion.Emphasized, animationsEnabled, Motion.Decelerate),
             label = "BarFraction"
         )
     }
 
+    // Twelve months need to share the plot at 360dp. A compact single-line axis is more useful than
+    // letting Compose wrap "May", "Sep" and "Dec" into clipped two-line fragments.
     val axisLabelStyle = MaterialTheme.typography.labelSmall.copy(
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        fontSize = 10.sp,
+        lineHeight = 12.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     val textMeasurer = rememberTextMeasurer(cacheSize = axisLabels.size)
     val axisLabelLayouts = remember(axisLabels, axisLabelStyle, textMeasurer) {
@@ -122,12 +134,27 @@ fun SpendingBarChart(
         }
     }
 
-    val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+    val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
     val barColor = MaterialTheme.colorScheme.primary
-    val selectedBarColor = MaterialTheme.colorScheme.secondary
+    val selectedBarColor = MaterialTheme.colorScheme.tertiary
+
+    // A canvas of bars is invisible to a screen reader unless the numbers are said out loud. The
+    // summary gives the same information the chart conveys visually - each labelled amount - without
+    // pretending to be an interactive control, which the per-bar tooltips are not.
+    val chartDescription = remember(data, labels) {
+        if (data.isEmpty()) {
+            "No spending to chart."
+        } else {
+            labels.zip(data).joinToString(separator = ", ") { (label, amount) ->
+                "$label ${formatIDR(amount.toLong())}"
+            }
+        }
+    }
 
     Column(
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = chartDescription }
     ) {
         // One gesture handler for the whole plot: a tap is mapped to the bar slot it lands on, so
         // selecting, toggling and clearing the selection all come from a single place. Keyed on the
@@ -259,12 +286,17 @@ fun SpendingBarChart(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                     Text(
+                         text = label,
+                         style = MaterialTheme.typography.labelSmall.copy(
+                             fontSize = 10.sp,
+                             lineHeight = 12.sp
+                         ),
+                         fontWeight = FontWeight.Medium,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                         maxLines = 1,
+                         softWrap = false
+                     )
                 }
             }
         }

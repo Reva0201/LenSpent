@@ -1,13 +1,39 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 and older (API < 31) backup policy.
+
+  Decision: personal expense data is NOT backed up or transferred off the device.
+
+  The ledger (Room), the preferences that name the user and hold their budget, the captured receipt
+  images and their OCR/structured text are all personal financial data. Android Auto Backup uploads
+  to the user's cloud account and is not end-to-end encrypted with a key this app controls, so it
+  would place a readable spending history in a third party's storage. The app has no documented,
+  encrypted backup design, so the safe default is to exclude everything.
+
+  `root` covers the app's whole private data directory, which is why it is excluded first; the named
+  exclusions below are kept for the next reader, so the intent is reviewable without knowing what
+  `root` implies. `cache` is deliberately absent: the platform never backs it up, and it is not a
+  valid domain in this file.
+
+  This file is referenced by android:fullBackupContent for devices before API 31. The API 31+ policy
+  lives in data_extraction_rules.xml, and android:allowBackup is false in the manifest as a
+  belt-and-braces default for OEMs that ignore the rule files.
+
+  If a real backup feature is ever added, it must be an explicit, user-initiated export to an
+  encrypted container - not silent cloud backup - and these rules are where that is revisited.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- Nothing in the app's private storage may leave the device. -->
+    <exclude domain="root" path="." />
+
+    <!-- The ledger: transactions, categories and capture metadata. -->
+    <exclude domain="database" path="lensspent.db" />
+    <exclude domain="database" path="lensspent.db-shm" />
+    <exclude domain="database" path="lensspent.db-wal" />
+
+    <!-- Settings that identify the user: name, budget, AI consent, theme. -->
+    <exclude domain="file" path="datastore/user_preferences.preferences_pb" />
+
+    <!-- App-private receipt images. -->
+    <exclude domain="file" path="receipts/" />
 </full-backup-content>

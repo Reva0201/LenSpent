@@ -6,15 +6,16 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.umn.lensspent.data.extraction.CaptureExtractor
-import org.umn.lensspent.data.model.CaptureStatus
 import org.umn.lensspent.data.model.Category
 import org.umn.lensspent.data.parseRupiahAmount
+import org.umn.lensspent.data.repository.CaptureImageDeleter
 import org.umn.lensspent.data.repository.TransactionRepository
 
 /**
@@ -138,6 +139,7 @@ internal fun confirmationOf(state: ExpenseReviewUiState.Editing, zone: ZoneId): 
 class ExpenseReviewViewModel(
     private val repository: TransactionRepository,
     private val extractor: CaptureExtractor,
+    private val images: CaptureImageDeleter = CaptureImageDeleter.None,
     private val clock: Clock = Clock.systemDefaultZone()
 ) : ViewModel() {
 
@@ -169,6 +171,14 @@ class ExpenseReviewViewModel(
     internal val savedExpense: StateFlow<SavedExpense?> = _savedExpense.asStateFlow()
 
     private var startedCaptureId: Long? = null
+
+    /**
+     * Guards [discard] against a double tap on Back while the first cleanup is still running.
+     *
+     * `discardCapture` deletes the row, so a second call would find nothing - but it would also
+     * return null and the screen would navigate twice. One flag is cheaper than reasoning about that.
+     */
+    private var _isDiscarding = false
 
     /** Idempotent on purpose: a recomposition or a rotation must not restart the extraction. */
     fun start(captureId: Long) {
@@ -236,11 +246,15 @@ class ExpenseReviewViewModel(
      */
     fun save() {
         val state = _uiState.value as? ExpenseReviewUiState.Editing ?: return
+        // The write below is not idempotent. Guarding on the flag that is set *synchronously* before
+        // the coroutine starts is what stops a double tap from inserting the same expense twice; the
+        // button's own `canSave` check is not enough because it is only re-read on recomposition.
+        if (state.isSaving) return
         val confirmation = confirmationOf(state, zone) ?: return
 
         _uiState.value = state.copy(isSaving = true)
         viewModelScope.launch {
-            try {
+            val written = try {
                 repository.addTransaction(
                     merchant = confirmation.merchant,
                     amount = confirmation.amountRupiah,
@@ -249,16 +263,35 @@ class ExpenseReviewViewModel(
                     note = null,
                     captureId = state.captureId
                 )
-                repository.updateCaptureStatus(state.captureId, CaptureStatus.CONFIRMED)
-                // The row exists; the sheet now says so. Nothing here sets [finished] - only the user
-                // acknowledging the confirmation does, which is what keeps the dashboard from
-                // appearing before the expense has been seen to land.
-                _savedExpense.value = confirmation
+                true
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                // Leave the sheet open with the user's input intact, so saving can simply be retried
-                e.printStackTrace()
-                _uiState.value = state.copy(isSaving = false)
+                // Leave the sheet open with the user's input intact, so saving can simply be retried.
+                // The exception text can quote row contents, so only the type is recorded, in debug.
+                AppLog.warn("saving a reviewed expense failed", e)
+                false
             }
+            if (!written) {
+                _uiState.value = state.copy(isSaving = false)
+                return@launch
+            }
+
+            // From here the row is the durable record. Cleanup is deliberately outside the failure
+            // path above: if it throws and the sheet re-enabled Save, a retry would insert a second
+            // copy of an expense that is already in the ledger. A stuck photo is recoverable by the
+            // startup sweep and the Settings action; duplicated money is not.
+            try {
+                val imageUri = repository.confirmCaptureAndForgetExtraction(state.captureId)
+                images.delete(imageUri)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.warn("the expense was saved but its capture cleanup failed", e)
+            }
+            // Nothing here sets [finished] - only the user acknowledging the confirmation does, which
+            // is what keeps the dashboard from appearing before the expense has been seen to land.
+            _savedExpense.value = confirmation
         }
     }
 
@@ -273,10 +306,20 @@ class ExpenseReviewViewModel(
         _finished.value = true
     }
 
+    /**
+     * The user backed out of the review without saving.
+     *
+     * The capture row and its private image are removed: an abandoned receipt is not something to
+     * keep, and leaving the row behind would show "From a receipt photo" on a transaction that does
+     * not exist. The extraction output dies with the row, which is the point of discarding.
+     */
     fun discard() {
         val captureId = _uiState.value?.captureId ?: return
+        if (_isDiscarding) return
+        _isDiscarding = true
         viewModelScope.launch {
-            repository.updateCaptureStatus(captureId, CaptureStatus.FAILED)
+            val imageUri = repository.discardCapture(captureId)
+            images.delete(imageUri)
             _finished.value = true
         }
     }

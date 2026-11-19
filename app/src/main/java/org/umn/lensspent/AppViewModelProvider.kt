@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import org.umn.lensspent.data.repository.CaptureImageDeleter
 import org.umn.lensspent.ui.onboarding.OnboardingViewModel
 import org.umn.lensspent.ui.settings.SettingsViewModel
 
@@ -28,17 +29,31 @@ object AppViewModelProvider {
         initializer {
             ExpenseReviewViewModel(
                 repository = application().container.transactionRepository,
-                extractor = application().container.captureExtractor
+                extractor = application().container.captureExtractor,
+                images = application().container.captureImageDeleter
             )
         }
-        initializer { AiChatViewModel(application().container.aiInsightsRepository) }
+        initializer {
+            AiChatViewModel(
+                insights = application().container.aiInsightsRepository,
+                preferences = application().container.userPreferencesRepository,
+                access = application().container.aiAccess
+            )
+        }
         initializer {
             OnboardingViewModel(application().container.userPreferencesRepository)
         }
         initializer {
             SettingsViewModel(
                 preferences = application().container.userPreferencesRepository,
-                ledger = application().container.transactionRepository
+                ledger = application().container.transactionRepository,
+                images = application().container.captureImageDeleter,
+                receiptBytes = {
+                    ImageStorage.storedBytes(application())
+                },
+                deleteReceiptImages = {
+                    ImageStorage.deleteAll(application())
+                }
             )
         }
         initializer { AddExpenseViewModel(application().container.transactionRepository) }
@@ -72,7 +87,8 @@ object AppViewModelProvider {
         initializer {
             TransactionDetailViewModel(
                 repository = application().container.transactionRepository,
-                transactionId = transactionId
+                transactionId = transactionId,
+                images = application().container.captureImageDeleter
             )
         }
     }

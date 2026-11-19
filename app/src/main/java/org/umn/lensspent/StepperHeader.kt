@@ -4,7 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -15,19 +16,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import org.umn.lensspent.ui.theme.Spacing
 
 /**
  * Shared header chrome for the screens that step through time (analytics and expense review).
  *
- * Every header sits in a band of exactly [HeaderRowHeight], so whatever follows it - the chart, the
- * amount, the form - starts on the same line whichever compartment or period is on screen. Stepping
- * through days therefore never nudges the page up or down.
+ * Every header has the same minimum band height, so whatever follows it - the chart, the amount, the
+ * form - starts in the same place whichever compartment is on screen. The minimum is a floor rather
+ * than a cap: a long date at a doubled font scale adds a second line and pushes the content below it
+ * down, instead of being clipped to fit a pixel height.
  */
 internal val HeaderRowHeight = 48.dp
 
@@ -45,33 +47,27 @@ internal fun dayName(date: LocalDate): String = date.format(DayNameFormatter)
 internal fun dateRangeLabel(start: LocalDate, endInclusive: LocalDate): String =
     "${start.format(DatePartFormatter)} - ${endInclusive.format(DatePartFormatter)}"
 
-/** The fixed-height band a compartment header occupies, centring whatever it is given. */
+/** The header band a compartment occupies. */
 @Composable
 internal fun HeaderSlot(content: @Composable () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(HeaderRowHeight),
+            .heightIn(min = HeaderRowHeight)
+            .padding(vertical = Spacing.xs),
         contentAlignment = Alignment.Center
     ) {
         content()
     }
 }
 
-/** A centred title in the same band as a stepper, for a compartment with nothing to step through. */
-@Composable
-internal fun LabelHeader(text: String) {
-    HeaderSlot {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1
-        )
-    }
-}
-
-/** Arrow stepper: "previous" is always available, "next" only while stepping back towards today. */
+/**
+ * Arrow stepper: "previous" is always available, "next" only while stepping back towards today.
+ *
+ * The date may wrap to two lines. That is deliberate: a date is the one thing here that must never
+ * be abbreviated, and 48dp is enough for one line at normal scale while still leaving room for a
+ * second when the user enlarges text.
+ */
 @Composable
 internal fun StepperHeader(
     label: String,
@@ -81,7 +77,7 @@ internal fun StepperHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(HeaderRowHeight),
+            .heightIn(min = HeaderRowHeight),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -94,8 +90,7 @@ internal fun StepperHeader(
         Text(
             text = label,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
+            maxLines = 2,
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f)
         )

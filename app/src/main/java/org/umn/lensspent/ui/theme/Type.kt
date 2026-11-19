@@ -18,10 +18,9 @@ import org.umn.lensspent.R
  * counters and slightly rounded terminals, so the same layout reads as designed rather than as a
  * template. It was also drawn in Jakarta, which is where this app's Rupiah are spent.
  *
- * One file, not four: the font carries a weight axis, so each weight is the same 172KB resource with a
+ * One file, not four: the font carries a weight axis, so each weight is the same resource with a
  * different variation setting. Asking for a [FontWeight.Bold] in code picks the 700 instance through
- * the family below rather than letting the platform smear a fake bold out of the 400 one, which is what
- * makes headings look crisp instead of slightly muddy.
+ * the family below rather than letting the platform smear a fake bold out of the 400 one.
  *
  * Licensed under the SIL Open Font License; the licence travels with the project at
  * `licenses/PlusJakartaSans-OFL.txt`.
@@ -53,82 +52,81 @@ internal val JakartaSans = FontFamily(
 /**
  * The app's type scale.
  *
- * It is a full scale rather than a `bodyLarge` override because the screens were inventing their own
- * emphasis: a number that mattered got `fontWeight = Bold` at the call site, a caption got a `fontSize`
- * literal, and no two screens agreed on either. Every step here is a decision made once - weight and
- * letter-spacing travel with the size, so calling code picks a role and inherits the right feel.
+ * It is a full scale rather than a `bodyLarge` override because the screens would otherwise invent
+ * their own emphasis: a number that mattered would get a bold override at the call site, a caption a
+ * literal size, and no two screens would agree on either. Every step here is a decision made once -
+ * weight and tracking travel with the size, so calling code picks a role and inherits the right feel.
  *
  * The shape of the scale is deliberate. Display and headline steps tighten their tracking as they grow,
- * which is what stops large money figures from looking loose and amateurish. Body steps open up their
- * line height and tracking instead, because long receipt lines and AI answers are read, not scanned.
- * Labels are the only medium-weight steps: they sit on buttons and tabs where the text has to hold its
- * own against a filled background.
+ * which is what stops large money figures from looking loose. Body steps open up their line height and
+ * tracking instead, because long receipt lines and AI answers are read, not scanned.
  *
- * One family: the platform's own sans. A bundled display face would be a nicer mark, but it is a 200KB
- * asset and a licensing question, and neither belongs in a midterm build.
+ * Body and supporting sizes were raised in the Monthly Compass pass: 16sp body and 14sp supporting
+ * text are the floor this app is comfortable putting a price beside, and both still scale with the
+ * system font setting because every size is expressed in `sp`.
  */
 val LensSpentTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.Normal,
-        fontSize = 57.sp,
-        lineHeight = 64.sp,
+        fontSize = 52.sp,
+        lineHeight = 58.sp,
         letterSpacing = (-0.5).sp
     ),
     displayMedium = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.Normal,
-        fontSize = 45.sp,
-        lineHeight = 52.sp,
+        fontSize = 42.sp,
+        lineHeight = 48.sp,
         letterSpacing = (-0.5).sp
     ),
     displaySmall = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.Normal,
-        fontSize = 36.sp,
-        lineHeight = 44.sp,
+        fontSize = 34.sp,
+        lineHeight = 42.sp,
         letterSpacing = (-0.25).sp
     ),
     headlineLarge = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 32.sp,
-        lineHeight = 40.sp,
+        fontSize = 30.sp,
+        lineHeight = 38.sp,
         letterSpacing = (-0.25).sp
     ),
     headlineMedium = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 28.sp,
-        lineHeight = 36.sp,
-        letterSpacing = (-0.25).sp
+        fontSize = 26.sp,
+        lineHeight = 34.sp,
+        letterSpacing = (-0.2).sp
     ),
     headlineSmall = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp,
-        lineHeight = 32.sp,
+        fontSize = 23.sp,
+        lineHeight = 31.sp,
         letterSpacing = (-0.1).sp
     ),
     titleLarge = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 22.sp,
+        fontSize = 21.sp,
         lineHeight = 28.sp,
         letterSpacing = 0.sp
     ),
     titleMedium = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp,
+        fontSize = 17.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.1.sp
     ),
     titleSmall = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
+        fontSize = 15.sp,
+        lineHeight = 21.sp,
         letterSpacing = 0.1.sp
     ),
     bodyLarge = TextStyle(
@@ -141,36 +139,36 @@ val LensSpentTypography = Typography(
     bodyMedium = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.Normal,
-        fontSize = 14.sp,
-        lineHeight = 22.sp,
-        letterSpacing = 0.2.sp
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.1.sp
     ),
     bodySmall = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 18.sp,
-        letterSpacing = 0.3.sp
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        letterSpacing = 0.15.sp
     ),
     labelLarge = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
+        fontSize = 15.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
     labelMedium = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.4.sp
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
+        letterSpacing = 0.2.sp
     ),
     labelSmall = TextStyle(
         fontFamily = JakartaSans,
         fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.5.sp
+        fontSize = 12.sp,
+        lineHeight = 17.sp,
+        letterSpacing = 0.2.sp
     )
 )

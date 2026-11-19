@@ -1,11 +1,7 @@
 package org.umn.lensspent
 
 import android.net.Uri
-import android.animation.ValueAnimator
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -79,11 +76,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.umn.lensspent.data.model.Category
 import org.umn.lensspent.ui.components.CategoryTilePicker
-import org.umn.lensspent.ui.theme.Elevation
+import org.umn.lensspent.ui.theme.Motion
 import org.umn.lensspent.ui.theme.Sizes
 import org.umn.lensspent.ui.theme.Spacing
-
-private val PreviewHeight = 200.dp
+import org.umn.lensspent.ui.theme.motionTween
+import org.umn.lensspent.ui.theme.rememberAnimationsEnabled
+private val PreviewHeight = 220.dp
 
 /**
  * The confirmation step, and the only place an expense ever enters the ledger.
@@ -117,10 +115,26 @@ fun ExpenseReviewScreen(
             TopAppBar(
                 title = { Text(text = "Confirm expense", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
-                    IconButton(onClick = onFinished) {
+                    IconButton(
+                        onClick = {
+                            // Backing out of an unfinished review is a discard, not a silent exit:
+                            // otherwise the capture row and its private photo would linger with no
+                            // way to reach them. Once the expense is saved the capture is already
+                            // gone, so there is nothing left to clean up and the plain callback is
+                            // the correct path.
+                            val state = uiState
+                            if (state is ExpenseReviewUiState.Editing ||
+                                state is ExpenseReviewUiState.Processing
+                            ) {
+                                viewModel.discard()
+                            } else {
+                                onFinished()
+                            }
+                        }
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Discard and go back"
                         )
                     }
                 },
@@ -182,10 +196,10 @@ internal fun SaveConfirmationDialog(saved: SavedExpense, onDismiss: () -> Unit) 
         // text in the middle of a wide phone.
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        val cardScale = remember { Animatable(0.9f) }
+        val cardScale = remember { Animatable(0.94f) }
         val contentAlpha = remember { Animatable(0f) }
         val tickProgress = remember { Animatable(0f) }
-        val animationsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+        val animationsEnabled = rememberAnimationsEnabled()
 
         LaunchedEffect(Unit) {
             if (!animationsEnabled) {
@@ -194,35 +208,37 @@ internal fun SaveConfirmationDialog(saved: SavedExpense, onDismiss: () -> Unit) 
                 tickProgress.snapTo(1f)
                 return@LaunchedEffect
             }
-            // The card arrives first and overshoots very slightly, so it reads as landing rather than
-            // fading in. The tick then draws over a third of a second - the pause between the card
-            // settling and the tick finishing is what makes the moment feel deliberate instead of
-            // instant.
+            // The card grows into place on the standard curve, then the tick draws while the copy
+            // fades up. No overshoot: this is a confirmation, and a card that bounces before settling
+            // reads as decoration rather than as an answer.
             cardScale.animateTo(
                 targetValue = 1f,
-                animationSpec = spring(dampingRatio = 0.62f, stiffness = 420f)
+                animationSpec = motionTween(Motion.Standard, easing = Motion.Decelerate)
             )
-            launch { contentAlpha.animateTo(1f, tween(SaveContentFadeMillis)) }
+            launch { contentAlpha.animateTo(1f, motionTween(Motion.Standard)) }
             tickProgress.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(
-                    durationMillis = SaveTickDrawMillis,
-                    delayMillis = SaveTickDelayMillis,
-                    easing = FastOutSlowInEasing
+                animationSpec = motionTween(
+                    durationMillis = Motion.Emphasized,
+                    easing = Motion.Decelerate
                 )
             )
         }
 
         Surface(
             modifier = Modifier
-                .padding(horizontal = Spacing.xxxl)
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.xl)
                 .graphicsLayer {
                     scaleX = cardScale.value
                     scaleY = cardScale.value
                 },
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = Elevation.modal
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant
+            )
         ) {
             Column(
                 modifier = Modifier.padding(Spacing.xxl),
@@ -277,8 +293,8 @@ internal fun SaveConfirmationDialog(saved: SavedExpense, onDismiss: () -> Unit) 
                     onClick = onDismiss,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    shape = MaterialTheme.shapes.large
+                        .heightIn(min = 48.dp),
+                    shape = MaterialTheme.shapes.medium
                 ) {
                     Text(
                         text = "Done",
@@ -351,10 +367,6 @@ private fun SavedCheck(progress: () -> Float) {
     }
 }
 
-private const val SaveContentFadeMillis = 220
-private const val SaveTickDrawMillis = 340
-private const val SaveTickDelayMillis = 140
-
 /**
  * First stage: the brief on-device work that happens before anything is editable.
  *
@@ -377,7 +389,10 @@ private fun ProcessingPane(modifier: Modifier) {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Runs on this device - nothing is uploaded.",
+                // True for the OCR pass itself: the photo and its text stay in app-private storage.
+                // The optional AI feature is a separate, opt-in act on aggregate totals, so this
+                // sentence does not claim the whole app never talks to a server.
+                text = "The receipt is read on this device. The photo stays in app-private storage.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -429,7 +444,7 @@ private fun EditingPane(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.xl, vertical = Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xxl)
+        verticalArrangement = Arrangement.spacedBy(Spacing.xl)
     ) {
         CapturePreview(preview = preview)
 
@@ -461,7 +476,7 @@ private fun EditingPane(
                 keyboardType = KeyboardType.Number,
                 imeAction = ImeAction.Done
             ),
-            shape = MaterialTheme.shapes.medium,
+            shape = MaterialTheme.shapes.small,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -481,7 +496,7 @@ private fun EditingPane(
                 capitalization = KeyboardCapitalization.Words,
                 imeAction = ImeAction.Next
             ),
-            shape = MaterialTheme.shapes.medium,
+            shape = MaterialTheme.shapes.small,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -506,7 +521,7 @@ private fun EditingPane(
             )
         }
 
-        Spacer(modifier = Modifier.height(Spacing.xxl))
+        Spacer(modifier = Modifier.height(Spacing.xl))
     }
 }
 
@@ -525,7 +540,10 @@ private fun ReviewActionBar(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = Elevation.floating
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        )
     ) {
         Row(
             modifier = Modifier
@@ -551,8 +569,8 @@ private fun ReviewActionBar(
                 enabled = state.canSave,
                 modifier = Modifier
                     .weight(1f)
-                    .height(52.dp),
-                shape = MaterialTheme.shapes.large
+                    .heightIn(min = 52.dp),
+                shape = MaterialTheme.shapes.medium
             ) {
                 if (state.isSaving) {
                     CircularProgressIndicator(
@@ -593,7 +611,9 @@ private fun CapturePreview(preview: ImageBitmap?) {
                 bitmap = preview,
                 contentDescription = "Captured receipt",
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                // Fit rather than Crop: this image is evidence for the numbers below it. Cropping a
+                // long receipt can hide exactly the total or merchant the user is checking.
+                contentScale = ContentScale.Fit
             )
         } else {
             Icon(

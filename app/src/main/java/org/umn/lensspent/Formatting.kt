@@ -41,8 +41,16 @@ fun formatTransactionDate(epochMillis: Long): String = Instant.ofEpochMilli(epoc
     .toLocalDate()
     .format(TransactionDateFormatter)
 
+/** "11:15 AM" in the device's zone, shown beside every transaction in a ledger. */
+fun formatTransactionTime(epochMillis: Long): String = Instant.ofEpochMilli(epochMillis)
+    .atZone(ZoneId.systemDefault())
+    .format(TransactionTimeFormatter)
+
 private val TransactionDateFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH)
+
+private val TransactionTimeFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
 
 /**
  * Compact Rupiah shorthand for the chart axis labels, e.g. 1700000f -> "Rp 1,7Jt", 561000f -> "Rp 561K".

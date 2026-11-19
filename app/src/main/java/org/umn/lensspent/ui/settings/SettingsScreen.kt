@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -23,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Share
@@ -37,6 +40,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -57,13 +61,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.util.Locale
 import org.umn.lensspent.AppViewModelProvider
 import org.umn.lensspent.data.local.NoBudgetIdr
 import org.umn.lensspent.data.local.ThemePreference
 import org.umn.lensspent.formatIDR
 import org.umn.lensspent.ui.budgetSupportingText
 import org.umn.lensspent.ui.parseBudgetInput
-import org.umn.lensspent.ui.theme.Elevation
 import org.umn.lensspent.ui.theme.Sizes
 import org.umn.lensspent.ui.theme.Spacing
 
@@ -92,17 +96,38 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pendingCsvExport by viewModel.pendingCsvExport.collectAsStateWithLifecycle()
+    val isConfirmingExport by viewModel.isConfirmingExport.collectAsStateWithLifecycle()
+    val isConfirmingReceiptRemoval by viewModel.isConfirmingReceiptRemoval.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) { viewModel.refreshReceiptSize() }
 
     // The export leaves through the system share sheet, so there is no folder to pick and no storage
     // permission to ask for: the user chooses the destination, and the file is written by whatever
-    // app they choose.
+    // app they choose. A failed launch clears the pending export rather than leaving the ledger
+    // sitting in a state that a later recomposition would share.
     LaunchedEffect(pendingCsvExport) {
         val csv = pendingCsvExport ?: return@LaunchedEffect
-        context.startActivity(
-            Intent.createChooser(transactionsCsvIntent(csv), "Export transactions")
+        val launched = runCatching {
+            context.startActivity(
+                Intent.createChooser(transactionsCsvIntent(csv), "Export transactions")
+            )
+        }.isSuccess
+        if (launched) viewModel.onCsvExportHandled() else viewModel.onCsvExportFailed()
+    }
+
+    if (isConfirmingExport) {
+        CsvExportConfirmationDialog(
+            onDismiss = viewModel::onExportDismissed,
+            onConfirm = viewModel::onExportConfirmed
         )
-        viewModel.onCsvExportHandled()
+    }
+
+    if (isConfirmingReceiptRemoval) {
+        ReceiptRemovalConfirmationDialog(
+            onDismiss = viewModel::onReceiptRemovalDismissed,
+            onConfirm = viewModel::onReceiptRemovalConfirmed
+        )
     }
 
     Scaffold(
@@ -149,12 +174,31 @@ fun SettingsScreen(
                 )
             }
 
+            SectionHeader("Privacy")
+            SettingsCard {
+                PrivacySection(
+                    aiBackendConfigured = uiState.aiBackendConfigured,
+                    aiNetworkEnabled = uiState.aiNetworkEnabled,
+                    aiConsentGranted = uiState.aiConsentGranted,
+                    aiAvailable = uiState.aiAvailable,
+                    storedReceiptBytes = uiState.storedReceiptBytes,
+                    onAiNetworkEnabledChanged = viewModel::onAiNetworkEnabledChanged,
+                    onRemoveReceiptImages = viewModel::onReceiptRemovalRequested
+                )
+            }
+
             SectionHeader("Data")
-            SettingsCard { DataSection(onExportTransactions = viewModel::exportTransactions) }
+            SettingsCard {
+                DataSection(
+                    onExportTransactions = viewModel::onExportRequested,
+                    onRemoveReceiptImages = viewModel::onReceiptRemovalRequested
+                )
+            }
 
             Spacer(Modifier.height(SettingsDimens.SectionSpacing))
             Text(
-                text = "LensSpent 1.0 — your ledger stays on this device",
+                text = "LensSpent 1.0 — receipts stay on this device. The optional AI feature sends " +
+                    "your question plus monthly totals by category, and only after you agree.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -167,16 +211,17 @@ fun SettingsScreen(
 }
 
 /**
- * A group label: small, upper-case, and quiet enough not to compete with the rows under it.
+ * A group label: sentence case, quiet, and clearly the start of a subject.
  *
- * It used to be primary-coloured, which put four bright blue labels on a page of otherwise quiet rows.
- * Muted grey keeps the hierarchy - the label still starts a group - without four competing accents.
+ * It used to be all-caps with tracked lettering. Four tracked labels on a page of quiet rows is the
+ * single most template-looking device in mobile settings screens, and at a large font scale the
+ * tracking made them the widest text on the screen. Sentence case does the same grouping job.
  */
 @Composable
 private fun SectionHeader(text: String) {
     Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = SettingsDimens.SectionSpacing, bottom = SettingsDimens.ItemSpacing)
     )
@@ -198,9 +243,8 @@ private fun SettingsCard(content: @Composable () -> Unit) {
         // Hairline rather than shadow: see LensCard. One outlined block per group.
         border = BorderStroke(
             width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
-        ),
-        shadowElevation = Elevation.card
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
     ) {
         Column(modifier = Modifier.padding(vertical = Spacing.xs)) {
             content()
@@ -247,7 +291,7 @@ private fun ProfileHeader(username: String) {
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Local profile · never leaves this device",
+                    text = "Local profile · stored on this device",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -276,13 +320,25 @@ private fun SettingsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                if (onClick != null) {
+                    Modifier
+                        .clickable(onClick = onClick)
+                        .heightIn(min = Sizes.touchTarget)
+                } else {
+                    Modifier
+                }
+            )
             .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
+                // The icon belongs beside the title, not beside the middle of a three-line
+                // supporting sentence. The trailing switch stays centred.
+                .align(Alignment.Top)
+                .padding(top = 1.dp)
                 .size(34.dp)
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
@@ -472,15 +528,163 @@ private fun ThemePreference.label(): String = when (this) {
     ThemePreference.DARK -> "Dark"
 }
 
+/**
+ * The privacy controls: one switch that stops all AI networking, and one action that removes the
+ * receipt photos the app has stored.
+ *
+ * The switch is a real gate, not a preference: `AiAccess` is re-read on every request, so flipping it
+ * stops the next question even if the disclosure was accepted earlier. Turning it back on does not
+ * re-ask for consent, because the acceptance is a separate record.
+ */
+@Composable
+private fun PrivacySection(
+    aiBackendConfigured: Boolean,
+    aiNetworkEnabled: Boolean,
+    aiConsentGranted: Boolean,
+    aiAvailable: Boolean,
+    storedReceiptBytes: Long,
+    onAiNetworkEnabledChanged: (Boolean) -> Unit,
+    onRemoveReceiptImages: () -> Unit
+) {
+    SettingsRow(
+        icon = Icons.Filled.AutoAwesome,
+        title = "AI Insights network access",
+        supporting = aiPrivacySupportingText(
+            backendConfigured = aiBackendConfigured,
+            networkEnabled = aiNetworkEnabled,
+            consentGranted = aiConsentGranted,
+            available = aiAvailable
+        ),
+        trailing = {
+            Switch(
+                checked = aiNetworkEnabled,
+                onCheckedChange = onAiNetworkEnabledChanged,
+                enabled = aiBackendConfigured
+            )
+        }
+    )
+
+    SettingsRow(
+        icon = Icons.Filled.DeleteSweep,
+        title = "Remove stored receipt images",
+        supporting = if (storedReceiptBytes > 0L) {
+            "${formatBytes(storedReceiptBytes)} of receipt photos on this device"
+        } else {
+            "No receipt photos stored"
+        },
+        trailing = { RowChevron() },
+        onClick = onRemoveReceiptImages
+    )
+}
+
+/**
+ * One sentence that is true for the current gate state.
+ *
+ * The distinction between "no backend in this build", "you turned it off" and "you have not agreed
+ * yet" matters: each points at a different action, and none of them claims the feature is broken.
+ */
+internal fun aiPrivacySupportingText(
+    backendConfigured: Boolean,
+    networkEnabled: Boolean,
+    consentGranted: Boolean,
+    available: Boolean
+): String = when {
+    !backendConfigured ->
+        "Unavailable in this build: no secure AI backend is configured. No API key is stored in the app."
+    !networkEnabled ->
+        "Off. Nothing about your spending is sent anywhere."
+    !consentGranted ->
+        "On, but not enabled yet: you will be asked to review what is sent before the first question."
+    available ->
+        "On. Your typed question and monthly totals by category are sent; receipts, notes and " +
+            "merchants never are."
+    else ->
+        "Off."
+}
+
+/** Human-readable size for the receipt-data row. Binary units, because this is a file total. */
+internal fun formatBytes(bytes: Long): String = when {
+    bytes <= 0L -> "0 KB"
+    bytes < 1024L -> "$bytes B"
+    bytes < 1024L * 1024L -> "${bytes / 1024L} KB"
+    else -> String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
+}
+
 /** Getting the ledger out: the one row here that leaves the app, and it only ever does so on request. */
 @Composable
-private fun DataSection(onExportTransactions: () -> Unit) {
+private fun DataSection(
+    onExportTransactions: () -> Unit,
+    onRemoveReceiptImages: () -> Unit
+) {
     SettingsRow(
         icon = Icons.Filled.Share,
         title = "Export transactions to CSV",
-        supporting = "Every expense as a CSV file",
+        supporting = "Every expense as a CSV file you choose where to send",
         trailing = { RowChevron() },
         onClick = onExportTransactions
+    )
+    SettingsRow(
+        icon = Icons.Filled.DeleteSweep,
+        title = "Delete receipt photos",
+        supporting = "Keeps the ledger; removes the stored images",
+        trailing = { RowChevron() },
+        onClick = onRemoveReceiptImages
+    )
+}
+
+/**
+ * The export disclosure.
+ *
+ * The export is the whole ledger - merchants, amounts, notes - leaving through another app the user
+ * picks. That is a materially different act from the rest of the app, so it gets a confirmation that
+ * says exactly what is in the file and where it can go. The wording is a constant so a test can pin it.
+ */
+@Composable
+internal fun CsvExportConfirmationDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(CsvExportDialogTitle) },
+        text = { Text(CsvExportDialogBody) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text("Choose where to send") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+internal const val CsvExportDialogTitle = "Share your complete ledger?"
+
+internal const val CsvExportDialogBody =
+    "This creates a CSV containing every expense: date, merchant, category, amount and note. " +
+        "The app hands it to whichever app you pick next, and that app's own privacy policy applies " +
+        "to it from then on. Nothing is exported unless you choose a destination."
+
+/** The receipt-image deletion disclosure: it removes photos, never ledger rows. */
+@Composable
+internal fun ReceiptRemovalConfirmationDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete stored receipt images?") },
+        text = {
+            Text(
+                "This removes the receipt photos and their OCR text from this device. Your " +
+                    "expense history, amounts, categories and notes stay in the ledger."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text("Delete images") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
     )
 }
 

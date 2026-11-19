@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -159,13 +160,62 @@ class UserPreferencesRepositoryTest {
         )
     }
 
+    /**
+     * The AI gate must start closed. A fresh install, or an upgrade from a build that had no consent
+     * concept, has no acceptance on disk - and the repository's default is what decides that.
+     */
+    @Test
+    fun `AI consent is not granted on a fresh install`() = runBlocking {
+        val repository = repository()
+
+        assertFalse(repository.aiConsentGranted.first())
+        assertFalse(repository.preferences.first()!!.aiConsentGranted)
+    }
+
+    @Test
+    fun `the AI networking switch defaults to on, but consent still gates it`() = runBlocking {
+        val repository = repository()
+
+        assertTrue(repository.aiNetworkEnabled.first())
+        assertFalse(
+            "the switch alone must never be enough",
+            repository.preferences.first()!!.aiConsentGranted
+        )
+    }
+
+    @Test
+    fun `consent survives a restart and can be revoked`() = runBlocking {
+        val file = File(temporaryFolder.root, "consent-${nextFile++}.preferences_pb")
+        val store = dataStoreAt(file)
+
+        UserPreferencesRepository(store).setAiConsentGranted(true)
+        // A second repository over the same bytes is what a process restart looks like.
+        assertTrue(UserPreferencesRepository(store).aiConsentGranted.first())
+
+        UserPreferencesRepository(store).setAiConsentGranted(false)
+        assertFalse(UserPreferencesRepository(store).aiConsentGranted.first())
+    }
+
+    @Test
+    fun `turning AI networking off does not erase the acceptance record`() = runBlocking {
+        val repository = repository()
+        repository.setAiConsentGranted(true)
+
+        repository.setAiNetworkEnabled(false)
+
+        assertFalse(repository.aiNetworkEnabled.first())
+        assertTrue(
+            "the switch and the acceptance are separate decisions",
+            repository.aiConsentGranted.first()
+        )
+    }
+
     private fun repository(): UserPreferencesRepository = UserPreferencesRepository(dataStore())
 
-    private fun dataStore(): DataStore<Preferences> = PreferenceDataStoreFactory.create(
-        scope = scope,
-        produceFile = {
-            // Deliberately not created first: DataStore expects to write the file itself.
-            File(temporaryFolder.root, "user_preferences_${nextFile++}.preferences_pb")
-        }
+    private fun dataStore(): DataStore<Preferences> = dataStoreAt(
+        File(temporaryFolder.root, "user_preferences_${nextFile++}.preferences_pb")
     )
+
+    private fun dataStoreAt(file: File): DataStore<Preferences> =
+        PreferenceDataStoreFactory.create(scope = scope, produceFile = { file })
 }

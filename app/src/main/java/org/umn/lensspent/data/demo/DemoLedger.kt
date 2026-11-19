@@ -2,22 +2,21 @@ package org.umn.lensspent.data.demo
 
 import java.time.Clock
 import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.coroutines.flow.first
 import org.umn.lensspent.data.model.CaptureSource
 import org.umn.lensspent.data.model.CaptureStatus
 import org.umn.lensspent.data.repository.TransactionRepository
 
 /**
- * One sample expense, as the demo ledger writes it.
+ * One sample expense.
  *
- * The category is named rather than numbered on purpose: the ids are assigned by Room at insert time,
- * so a demo row that carried `categoryId = 2` would depend on the seeding order staying exactly as it is
- * today. A name is the durable handle, and the seeder resolves it against the taxonomy that is actually
- * on the device.
+ * The category is a name, not an id: Room assigns ids at insert time, so a hardcoded `categoryId = 2`
+ * would break the moment the seeding order changed. The seeder looks the name up against the taxonomy
+ * actually on the device.
  *
- * [daysAgo] is a distance from today rather than a fixed timestamp, so the demo ledger is always "the
- * last four weeks" whenever it is installed, and the Daily, Weekly and Yearly tabs all have something
- * to show on the day it is graded.
+ * [daysAgo] counts back from today, so the demo always covers the last four weeks no matter when the
+ * app is installed.
  */
 data class DemoExpense(
     val merchant: String,
@@ -95,9 +94,19 @@ class DemoLedgerSeeder(
             // category is a foreign key, so an unresolved name would throw on the first insert.
             val categoryId = categoryIdsByName[entry.categoryName] ?: return@forEachIndexed
 
+            // Seeded rows sit on fixed midday-ish slots. Two of them are dated today, so their times
+            // start at 00:30 and step backwards through the small hours: anything the user adds during
+            // the day is later than them and therefore sits above them in the list. A seeded row with
+            // an evening time would outrank a real afternoon entry, which reads as the app having lost
+            // it.
+            val seededTime = if (entry.daysAgo == 0) {
+                LocalTime.of(0, 30).plusMinutes((index % 4) * 90L)
+            } else {
+                LocalTime.of(9 + (index * 3) % 11, 30)
+            }
             val occurredAt = today
                 .minusDays(entry.daysAgo.toLong())
-                .atTime(9 + (index * 3) % 11, 30)
+                .atTime(seededTime)
                 .atZone(clock.zone)
                 .toInstant()
                 .toEpochMilli()

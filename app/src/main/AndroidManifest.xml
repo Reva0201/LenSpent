@@ -2,24 +2,40 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+      Camera is requested only when the user opens the receipt camera (CameraScreen does the
+      runtime request). It is not needed by manual entry, the ledger, charts, settings, or AI.
+    -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Premium AI Insights asks DeepSeek over HTTPS; nothing else in the app touches the network -->
+
+    <!--
+      Network, but only for the optional AI Insights backend. No provider API key is shipped in
+      the APK; see AiBackendConfig and data/remote/DeepSeekApiClient.
+    -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+
+    <!--
+      No storage permissions at all.
+
+      PickVisualMedia (the system photo picker) returns a per-selection read grant, and captures are
+      written to app-private internal storage, so neither reading the library nor writing to shared
+      storage is required on any supported API level. READ_MEDIA_IMAGES, READ_EXTERNAL_STORAGE and
+      WRITE_EXTERNAL_STORAGE were removed along with the shared-gallery capture code.
+    -->
+
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:name=".LensSpentApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.LensSpent">
+        android:theme="@style/Theme.LensSpent"
+        tools:targetApi="31">
 
         <activity
             android:name=".MainActivity"

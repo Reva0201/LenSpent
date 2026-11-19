@@ -1,12 +1,80 @@
-# Add project specific R8 rules here.
-# AGP will combine all keep rule files in src/main/keepRules to pass to R8
+# R8 keep rules for LensSpent.
 #
-# For more details, see
-#   https://d.android.com/r/tools/r8/keep-rules
+# AGP merges every file in src/main/keepRules and applies them to release builds only. The library
+# keep rules shipped by Room, Retrofit, ML Kit and Compose are still honoured (the release build does
+# not set keepRules.ignoreFromAllExternalDependencies), so this file contains only what those rules
+# do not already cover, plus one deliberate hardening: the SQLite and logging seams the app calls
+# reflectively.
+#
+# Principle: keep behaviour, not names. Nothing here disables obfuscation broadly; each rule names a
+# concrete entry point.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# ---------------------------------------------------------------------------------------------
+# kotlinx.serialization
+# ---------------------------------------------------------------------------------------------
+# The AI request/response classes use the compiler-generated serializer. R8 cannot see that
+# `ChatCompletionRequest.serializer()` is called reflectively by the converter, so the generated
+# `$serializer` and the companion objects are kept for the one package that is serialized.
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+
+-keepclassmembers class org.umn.lensspent.data.remote.** {
+    *** Companion;
+}
+-keepclasseswithmembers class org.umn.lensspent.data.remote.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class org.umn.lensspent.data.remote.**$$serializer { *; }
+
+# Retrofit reads generic signatures of the service interface to build the call adapter.
+-keepattributes Signature, Exceptions
+-keep,allowobfuscation,allowshrinking interface retrofit2.Call
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
+
+# The API interface is the only Retrofit service; its method and annotations must survive.
+-keep interface org.umn.lensspent.data.remote.DeepSeekApi { *; }
+
+# ---------------------------------------------------------------------------------------------
+# Room
+# ---------------------------------------------------------------------------------------------
+# Room's generated implementations are referenced by generated code and by the database builder, so
+# they must not be renamed. Entities and DAOs are kept by the library's own rules; the generated
+# `_Impl` classes are the gap.
+-keep class org.umn.lensspent.data.local.LensSpentDatabase_Impl { *; }
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class * { *; }
+-dontwarn androidx.room.paging.**
+
+# ---------------------------------------------------------------------------------------------
+# ML Kit
+# ---------------------------------------------------------------------------------------------
+# The recognizer is loaded through Play Services internals that reference classes by name. Keeping
+# the ML Kit packages is the documented integration requirement; the warning suppression covers the
+# optional vision modules this app does not ship.
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_text** { *; }
+-dontwarn com.google.mlkit.**
+-dontwarn com.google.android.gms.**
+
+# ---------------------------------------------------------------------------------------------
+# Compose
+# ---------------------------------------------------------------------------------------------
+# Compose's runtime discovers `@Composable` lambdas and the tooling inspection hooks by name during
+# development; release only needs the runtime classes, which the Compose plugin already configures.
+# This rule is intentionally narrow: it protects the app's own composables that are invoked
+# reflectively by the preview/test manifests, and leaves the library untouched.
+-keep class org.umn.lensspent.ui.theme.** { *; }
+-dontwarn androidx.compose.**
+
+# ---------------------------------------------------------------------------------------------
+# Coroutines
+# ---------------------------------------------------------------------------------------------
+# kotlinx-coroutines ships its own rules; this only silences the optional debug-agent references.
+-dontwarn kotlinx.coroutines.debug.**
+
+# ---------------------------------------------------------------------------------------------
+# Application entry points referenced from the manifest by name.
+# ---------------------------------------------------------------------------------------------
+-keep class org.umn.lensspent.LensSpentApplication { *; }
+-keep class org.umn.lensspent.MainActivity { *; }

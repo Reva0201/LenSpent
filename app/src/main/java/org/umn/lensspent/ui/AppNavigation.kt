@@ -23,6 +23,7 @@ import org.umn.lensspent.TransactionDetailScreen
 import org.umn.lensspent.data.local.UserPreferences
 import org.umn.lensspent.ui.onboarding.OnboardingScreen
 import org.umn.lensspent.ui.settings.SettingsScreen
+import org.umn.lensspent.ui.theme.Motion
 
 /**
  * The capture a review screen was opened for, as it appears in the route.
@@ -32,9 +33,9 @@ private const val CaptureIdArg = "captureId"
 /** The expense a detail screen was opened for, as it appears in the route. */
 private const val TransactionIdArg = "transactionId"
 
-/** Screen transition timing: quick enough to feel like a tap, not a scene change. */
-private const val ScreenFadeInMillis = 220
-private const val ScreenFadeOutMillis = 160
+/** Screen transition timing: the same standard step the tab pill and pager use. */
+private const val ScreenFadeInMillis = Motion.Standard
+private const val ScreenFadeOutMillis = Motion.Quick
 
 /**
  * Every destination in the app, named once.
@@ -103,22 +104,22 @@ fun LensSpentNavHost(
         // distance is deliberately small: this is a ledger, and a slide that travels the full width
         // makes every tap feel like a bigger event than opening one expense.
         enterTransition = {
-            fadeIn(animationSpec = tween(ScreenFadeInMillis)) +
+            fadeIn(animationSpec = tween(ScreenFadeInMillis, easing = Motion.Decelerate)) +
                 slideInHorizontally(
-                    animationSpec = tween(ScreenFadeInMillis),
+                    animationSpec = tween(ScreenFadeInMillis, easing = Motion.Decelerate),
                     initialOffsetX = { it / 12 }
                 )
         },
         exitTransition = {
-            fadeOut(animationSpec = tween(ScreenFadeOutMillis))
+            fadeOut(animationSpec = tween(ScreenFadeOutMillis, easing = Motion.Accelerate))
         },
         popEnterTransition = {
-            fadeIn(animationSpec = tween(ScreenFadeInMillis))
+            fadeIn(animationSpec = tween(ScreenFadeInMillis, easing = Motion.Decelerate))
         },
         popExitTransition = {
-            fadeOut(animationSpec = tween(ScreenFadeOutMillis)) +
+            fadeOut(animationSpec = tween(ScreenFadeOutMillis, easing = Motion.Accelerate)) +
                 slideOutHorizontally(
-                    animationSpec = tween(ScreenFadeOutMillis),
+                    animationSpec = tween(ScreenFadeOutMillis, easing = Motion.Accelerate),
                     targetOffsetX = { it / 12 }
                 )
         }
@@ -209,7 +210,15 @@ fun LensSpentNavHost(
         }
 
         composable(AppRoutes.Analytics) {
-            AnalyticsScreen(onNavigateBack = { navController.popBackStack() })
+            AnalyticsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                // The history in Trends is the same ledger as the dashboard's. Opening a row here
+                // pushes the same detail destination, so "See all" reaches every expense and not
+                // just the six most recent.
+                onOpenTransaction = { transactionId ->
+                    navController.navigate(AppRoutes.transaction(transactionId))
+                }
+            )
         }
 
         composable(AppRoutes.AiInsights) {

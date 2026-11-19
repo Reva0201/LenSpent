@@ -2,6 +2,7 @@ package org.umn.lensspent.data.extraction
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.umn.lensspent.data.model.Capture
@@ -86,7 +87,16 @@ class ReceiptStructurerTest {
 
         val fastPath = steps.single()
         assertEquals(ExtractionStage.FAST_PATH, fastPath.stage)
-        assertTrue(fastPath.detail, fastPath.detail.contains("TOKO SUMBER JAYA"))
-        assertTrue(fastPath.detail, fastPath.detail.contains("25000"))
+        // The trace says whether a value was found, never the value itself: it can reach logcat.
+        assertTrue(fastPath.detail, fastPath.detail.contains("merchant=true"))
+        assertTrue(fastPath.detail, fastPath.detail.contains("amount=true"))
+        assertFalse(
+            "the trace must not carry the merchant name",
+            fastPath.detail.contains("TOKO SUMBER JAYA")
+        )
+        assertFalse(
+            "the trace must not carry the amount",
+            fastPath.detail.contains("25000")
+        )
     }
 }

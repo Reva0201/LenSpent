@@ -2,13 +2,13 @@ package org.umn.lensspent.data.extraction
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
+import org.umn.lensspent.AppLog
 import org.umn.lensspent.data.model.Capture
 import org.umn.lensspent.data.model.ExpenseDraft
 import org.umn.lensspent.data.repository.TransactionRepository
@@ -42,35 +42,38 @@ class MlKitCaptureExtractor(
         capture: Capture,
         onStep: (ExtractionStep) -> Unit
     ): ExpenseDraft {
-        // Every stage is written to logcat from one place, so the tap itself is optional: a receipt
-        // that read badly can be looked at afterwards, which is the only way to see a model load on a
-        // device nobody is holding.
+        // Steps are reported to the caller and, in debug builds only, to logcat as a fixed label plus
+        // the stage's short status. The *content* of what was read is never logged: OCR text,
+        // merchant names and amounts are the user's financial data, and logcat is not a private place.
         val report: (ExtractionStep) -> Unit = { step ->
-            Log.d(Tag, "${step.stage.label}: ${step.detail}")
+            AppLog.debug("extraction stage: ${step.stage.label}")
             onStep(step)
         }
 
         return try {
             report(ExtractionStep(ExtractionStage.OCR, "reading the image"))
             val recognized = readReceipt(capture)
-            // The rows, not the raw block order: when a capture comes back empty this is what the
-            // pipeline actually read, and it is the one thing that cannot be seen from the ledger.
-            Log.d(Tag, "Captured ${capture.id} rows:\n" + recognized.lines.joinToString("\n"))
+            // Line count only - never the rows themselves. It is enough to answer "did OCR see
+            // anything at all?" without copying a receipt into a log buffer.
+            AppLog.debug("ocr read ${recognized.lines.size} rows")
             report(ExtractionStep(ExtractionStage.OCR, "${recognized.lines.size} rows read"))
             structurer.structure(capture, recognized, onStep = report)
                 .also { draft ->
-                Log.i(
-                    Tag,
-                    "Capture ${capture.id} -> merchant='${draft.merchant}' amount=${draft.amountRupiah}"
-                )
-            }
+                    // Booleans, not values: whether the fast path found a merchant/amount is the
+                    // diagnostic, and the values themselves must never reach a log buffer.
+                    val foundMerchant = draft.merchant.isNotBlank()
+                    val foundAmount = draft.amountRupiah > 0L
+                    AppLog.debug("fast path produced merchant=$foundMerchant amount=$foundAmount")
+                }
         } catch (e: CancellationException) {
             // The screen went away mid-extraction. That is not a failed extraction, and swallowing it
             // would break the scope the sheet's own lifecycle runs on.
             throw e
         } catch (e: Exception) {
-            report(ExtractionStep(ExtractionStage.OCR, "could not read the image: ${e.message}"))
-            Log.e(Tag, "Could not read capture ${capture.id}; opening an empty sheet", e)
+            // The exception message can quote a file path or recognizer output, so only the type is
+            // logged, and only in debug.
+            report(ExtractionStep(ExtractionStage.OCR, "could not read the image"))
+            AppLog.warn("receipt extraction failed", e)
             ExpenseDraft()
         }
     }
@@ -98,8 +101,6 @@ class MlKitCaptureExtractor(
     }
 
     companion object {
-        private const val Tag = "MlKitCaptureExtractor"
-
         /** Stored on the capture so it is visible which model produced its OCR text. */
         const val ModelVersion = "mlkit-text-recognition-16.0.1"
     }

@@ -31,6 +31,26 @@ class LensSpentApplication : Application() {
             if (BuildConfig.DEMO_LEDGER) {
                 DemoLedgerSeeder(container.transactionRepository).seedIfEmpty()
             }
+            // Receipt images are written before the capture row that names them, so a crash, a
+            // cancelled extraction or a killed process can leave a private file nothing points at.
+            // Sweeping at startup closes that window without touching a file a live capture owns.
+            sweepOrphanedReceiptImages()
+        }
+    }
+
+    /**
+     * Removes receipt files no capture row references.
+     *
+     * Only files inside the app's own `receipts/` directory can be affected: the sweep asks
+     * `ImageStorage`, which refuses any path outside it. A failure here is not worth surfacing - the
+     * sweep runs again next launch - but it is recorded in debug builds.
+     */
+    private suspend fun sweepOrphanedReceiptImages() {
+        runCatching {
+            val referenced = container.transactionRepository.captureImageUris().toSet()
+            ImageStorage.deleteOrphans(this, isReferenced = { uri -> uri in referenced })
+        }.onFailure { failure ->
+            AppLog.warn("receipt image sweep failed", failure)
         }
     }
 }

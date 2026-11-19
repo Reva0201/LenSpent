@@ -3,22 +3,17 @@ package org.umn.lensspent.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * The nine category colours, as one designed set.
+ * The nine category colours.
  *
- * These are not the Material swatches the taxonomy first shipped with. Those were bright and unevenly
- * weighted - `#4CAF50` and `#FF7043` sit at very different perceived lightness - which made the
- * transaction list, the category tiles and the breakdown bars the loudest thing on a page whose palette
- * is otherwise muted ink and teal. A category colour appears on every row, so it has to belong to the
- * brand rather than sit on top of it.
+ * These started as Material swatches (#4CAF50, #FF7043, #AB47BC) and were far too loud: a category
+ * colour appears on every row, every tile and every breakdown bar, so they ended up outshouting the
+ * rest of the palette. Each hue is now pulled down to roughly the same chroma and lightness, and
+ * spread around the wheel so groceries, dining and transport don't look alike at a glance.
  *
- * What unifies them: every hue is desaturated to roughly the same chroma, every one sits near 45%
- * lightness, and they are spaced around the wheel so neighbouring categories in the list - groceries,
- * dining, transport - never look like the same colour at a glance. Red is deliberately absent from the
- * main set: it is the error colour, and a category that looks like a warning is a category the user
- * reads as something going wrong.
+ * No red in the set. Red means error here, and a category that looks like a warning reads as one.
  *
- * Stored on the category row as a hex string, like any user-defined category can be, so this list is a
- * seed rather than a hard binding: a category the user adds keeps whatever colour it is given.
+ * The value is stored on the category row as a hex string, so this is a seed and not a binding: a
+ * category the user adds keeps whatever colour it was given.
  */
 object CategoryPalette {
     val Groceries = Color(0xFF4E8C61)

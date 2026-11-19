@@ -11,6 +11,10 @@ import org.umn.lensspent.data.model.Transaction
  * The app's data boundary: screens talk to this and never to Room, so the storage engine, the
  * aggregation strategy (today in Kotlin, later in SQL) or a future encrypted database can change
  * without touching the UI.
+ *
+ * The capture methods that end in `ForCapture` exist so the *screen* can own the retention decision:
+ * deleting an image is a filesystem action, and this interface deliberately knows nothing about
+ * `Context` or files.
  */
 interface TransactionRepository {
 
@@ -43,11 +47,24 @@ interface TransactionRepository {
 
     suspend fun updateTransaction(transaction: Transaction)
 
+    /**
+     * Deletes the expense and, when it was created from a capture, that capture row too.
+     *
+     * Returns the capture's stored image URI when there is one, so the caller can delete the file.
+     * Deleting the file is not this layer's job, but leaving the row behind would be an orphan the
+     * sweep could never attribute; both halves happen here and the caller only removes the bytes.
+     */
+    suspend fun deleteTransactionAndOrphanCapture(id: Long): String?
+
+    /** Deletes the expense only. Kept for callers that genuinely have no capture to clean up. */
     suspend fun deleteTransaction(id: Long)
 
     fun observeRecentCaptures(limit: Int = RecentCaptures): Flow<List<Capture>>
 
     suspend fun findCapture(id: Long): Capture?
+
+    /** Every image URI a capture row still points at, for the periodic orphan-file sweep. */
+    suspend fun captureImageUris(): List<String>
 
     /**
      * Records an image the moment it is taken or picked, before any extraction has run on it.
@@ -72,6 +89,31 @@ interface TransactionRepository {
         structuredJson: String? = null,
         modelVersion: String? = null
     )
+
+    /**
+     * Marks a capture confirmed and drops its OCR text and structured JSON.
+     *
+     * The transaction is now the record; keeping raw receipt text around after confirmation is
+     * retention without a purpose. Returns the image URI so the caller can delete the file.
+     */
+    suspend fun confirmCaptureAndForgetExtraction(captureId: Long): String?
+
+    /**
+     * Marks a capture failed and deletes its row, returning the image URI to remove.
+     *
+     * Used by Discard and by the review screen's back-out path: a receipt the user rejected should
+     * not linger in storage.
+     */
+    suspend fun discardCapture(captureId: Long): String?
+
+    /**
+     * Removes all receipt data: capture rows, their stored image URIs, and the links from
+     * transactions that pointed at them.
+     *
+     * Returns the URIs whose files the caller must delete. The ledger rows themselves are kept: the
+     * user asked to remove photos, not their spending history.
+     */
+    suspend fun forgetAllCaptures(): List<String>
 
     /**
      * Seeds the category taxonomy.

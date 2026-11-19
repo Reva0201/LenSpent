@@ -53,6 +53,17 @@ interface TransactionDao {
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("SELECT * FROM transactions WHERE id = :id LIMIT 1")
+    suspend fun findById(id: Long): TransactionEntity?
+
+    /** How many rows still reference a capture; used before deleting the capture row. */
+    @Query("SELECT COUNT(*) FROM transactions WHERE captureId = :captureId")
+    suspend fun countForCapture(captureId: Long): Int
+
+    /** Detaches every row from its capture, for the "remove receipt data" action. */
+    @Query("UPDATE transactions SET captureId = NULL")
+    suspend fun clearCaptureLinks()
+
     /**
      * One row, observed.
      *

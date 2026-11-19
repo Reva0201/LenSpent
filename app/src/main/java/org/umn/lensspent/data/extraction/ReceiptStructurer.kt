@@ -40,10 +40,13 @@ internal class ReceiptStructurer(
         )
 
         val draft = ReceiptParser.parseLines(recognized)
+        // A status, not a transcription: the step trace is reported to a listener and, in debug builds,
+        // to logcat, so it says whether the fast path found anything without naming a merchant or an
+        // amount.
         onStep(
             ExtractionStep(
                 ExtractionStage.FAST_PATH,
-                "read merchant='${draft.merchant}' amount=${draft.amountRupiah}"
+                "merchant=${draft.merchant.isNotBlank()} amount=${draft.amountRupiah > 0L}"
             )
         )
 

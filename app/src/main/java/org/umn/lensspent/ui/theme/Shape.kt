@@ -7,18 +7,15 @@ import androidx.compose.ui.unit.dp
 /**
  * The app's shape vocabulary: one radius per role, and no radius written at a call site.
  *
- * The scale is deliberately softer than Material's default 4/8/12/16/28. A receipt is a document, and
- * the app is mostly cards on a page, so the radii step up as the surface grows: a chip is barely
- * rounded, a card is clearly rounded, a sheet is almost a lozenge. Keeping the steps a fixed ratio apart
- * is what makes screens built at different times look like they belong to one app.
- *
- * `extraLarge` is above Material's 28dp because the analytics sheet is the widest surface in the app and
- * a 28dp corner on a full-width sheet reads as an accident rather than a decision.
+ * The scale is deliberately restrained. A receipt is a document, and most of this app is text on a
+ * page rather than a tray of floating cards, so the radii stay small: fields are barely rounded,
+ * controls are clearly rounded, and only a true surface - a grouped settings block, a dialog - gets a
+ * larger corner. Keeping the steps fixed is what makes screens built a week apart look related.
  */
 val LensSpentShapes = Shapes(
-    extraSmall = RoundedCornerShape(6.dp),
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(22.dp),
-    extraLarge = RoundedCornerShape(30.dp)
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(20.dp)
 )

@@ -21,6 +21,10 @@ interface CaptureDao {
     @Query("SELECT * FROM captures WHERE sourceUri = :sourceUri LIMIT 1")
     suspend fun findBySourceUri(sourceUri: String): CaptureEntity?
 
+    /** Every image URI still referenced by a capture, for the orphan sweep. */
+    @Query("SELECT sourceUri FROM captures")
+    suspend fun allSourceUris(): List<String>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(entity: CaptureEntity): Long
 
@@ -42,4 +46,23 @@ interface CaptureDao {
         structuredJson: String?,
         modelVersion: String?
     )
+
+    /**
+     * Drops the OCR text and structured JSON but keeps the row.
+     *
+     * Used when a capture is confirmed: the transaction is the durable record, so the receipt's raw
+     * text and the model's JSON have no further purpose and should not sit on disk indefinitely.
+     */
+    @Query("UPDATE captures SET ocrText = NULL, structuredJson = NULL WHERE id = :id")
+    suspend fun clearExtraction(id: Long)
+
+    @Query("DELETE FROM captures WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    /** Deletes every capture, so a "remove receipt data" action cannot leave rows pointing at nothing. */
+    @Query("DELETE FROM captures")
+    suspend fun deleteAll()
+
+    @Query("SELECT COUNT(*) FROM captures")
+    suspend fun count(): Int
 }

@@ -6,27 +6,43 @@ plugins {
 }
 
 /**
- * The DeepSeek key for the Premium AI Insights tier, resolved once at configuration time.
+ * Where the optional AI Insights feature may send its (aggregated) request.
  *
- * It is never committed: the three sources are, in order, `-PdeepseekApiKey=...` on the command line,
- * the `DEEPSEEK_API_KEY` environment variable CI sets, and `deepseek.api.key` in the developer's
- * `local.properties` (which is already git-ignored). A checkout with none of them still builds and
- * installs - the chat screen then says the key is missing instead of failing on a call that cannot
- * work. See DeepSeekApiClient for the header it ends up in.
+ * The app deliberately ships **no** third-party API credential. A mobile APK is not a secret store:
+ * anything placed in `BuildConfig`, resources or `local.properties` and compiled into the APK can be
+ * extracted with `strings` in a few seconds. The only safe place for a provider key is a server the
+ * developer controls, so this build points the feature at an https proxy/backend that owns the key
+ * and authenticates the calling app itself.
+ *
+ * Configuration is intentionally non-secret and optional:
+ *  - `-PlensSpentAiProxyUrl=https://your-proxy.example/`
+ *  - environment variable `LENS_SPENT_AI_PROXY_URL`
+ *
+ * With neither set the URL is empty, the AI feature is unavailable, and the UI says so. Every other
+ * feature works offline. See `AiBackendConfig` and `DeepSeekApiClient`.
  */
-val deepSeekApiKey: Provider<String> = providers.gradleProperty("deepseekApiKey")
-    .orElse(providers.environmentVariable("DEEPSEEK_API_KEY"))
-    .orElse(
-        providers.provider {
-            val localProperties = rootProject.file("local.properties")
-            localProperties.takeIf { it.exists() }
-                ?.readLines()
-                ?.firstOrNull { line -> line.trimStart().startsWith("deepseek.api.key") }
-                ?.substringAfter('=')
-                ?.trim()
-                .orEmpty()
+val aiProxyBaseUrl: Provider<String> = providers.gradleProperty("lensSpentAiProxyUrl")
+    .orElse(providers.environmentVariable("LENS_SPENT_AI_PROXY_URL"))
+    .orElse("")
+    .map { it.trim() }
+
+/**
+ * A proxy URL must be https: an expense summary must never leave the phone in clear text, and the
+ * proxy is the component holding the provider credential. A misconfigured http URL is rejected at
+ * runtime by `AiBackendConfig` rather than silently downgrading the transport.
+ */
+val aiProxyBaseUrlForBuild: String = aiProxyBaseUrl.get().let { url ->
+    when {
+        url.isEmpty() -> ""
+        url.startsWith("https://", ignoreCase = true) -> url
+        else -> {
+            logger.warn(
+                "LensSpent: ignoring AI proxy URL because it is not https; AI Insights will be disabled."
+            )
+            ""
         }
-    )
+    }
+}
 
 /**
  * Whether this build starts with the sample ledger in [org.umn.lensspent.data.demo.DemoLedger].
@@ -54,18 +70,37 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Baked into the APK as a constant: the app has no backend to hand out keys, so the key a
-        // build ships with is the key the chat uses.
-        buildConfigField("String", "DEEPSEEK_API_KEY", "\"${deepSeekApiKey.get()}\"")
+        // Deliberately never a provider key: only the address of a server this project controls may
+        // be compiled in. Empty means the AI feature is off, which is the default.
+        buildConfigField("String", "AI_PROXY_BASE_URL", "\"${aiProxyBaseUrlForBuild}\"")
         // See the note on `demoLedger` above: on for the submitted build, off for a real one.
         buildConfigField("boolean", "DEMO_LEDGER", demoLedger.get())
     }
 
     buildTypes {
         release {
+            // R8 removes unreachable code and renames what is left; resource shrinking drops assets no
+            // reachable code references. Both stay off in debug so stack traces stay readable.
+            //
+            // Keep rules live in src/main/keepRules (AGP merges that folder) rather than a legacy
+            // proguard-rules.pro: the files there are the ones this build actually applies.
             optimization {
-                enable = false
+                enable = true
+                // Library keep rules are still honoured; only the defaults are R8's own.
+                keepRules {
+                    includeDefault = true
+                }
             }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // No release signing material is checked in. A build without these properties produces an
+            // unsigned release artifact, which is the correct outcome for a repository.
+            signingConfig = null
+        }
+        debug {
+            // Explicit rather than implied: a debug build must never be minified.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
     compileOptions {
@@ -74,30 +109,45 @@ android {
     }
     buildFeatures {
         compose = true
-        // DeepSeekApiClient reads the key from BuildConfig, which AGP no longer generates by default.
+        // The generated constants this build reads: BuildConfig.DEBUG (AppLog, demo ledger) and
+        // BuildConfig.AI_PROXY_BASE_URL (the non-secret AI backend address).
         buildConfig = true
+    }
+
+    testOptions {
+        unitTests {
+            // The JVM tests exercise ViewModels that call AppLog, and AppLog is a thin wrapper over
+            // android.util.Log. Returning defaults instead of throwing "not mocked" keeps those tests
+            // focused on the state machine; the logging behaviour itself is covered by
+            // SensitiveLoggingTest's static checks.
+            isReturnDefaultValues = true
+        }
     }
 
 }
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
+    // Required by res/values/themes.xml: the Material3 DayNight parent style only exists in this AAR.
     implementation("com.google.android.material:material:1.12.0")
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
-    implementation("androidx.compose.material:material-icons-core:1.7.2")
-    implementation("androidx.compose.material:material-icons-extended:1.7.2")
+    // Icons are BOM-managed; the explicit versions that used to be here were inert (the BOM already
+    // resolved them to 1.7.8) and made the catalog look inconsistent.
+    implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.androidx.compose.ui)
+    // Directly imported (Color, Brush, Path, ImageBitmap), so it is declared rather than borrowed
+    // from ui's transitive graph.
     implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     // Offline-first persistence: everything the app knows about spending lives in Room on-device
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-    // What the user chose about the app itself - onboarding done, name, theme, key - is a handful of
-    // switches rather than rows, so it belongs in DataStore next to the ledger rather than inside it
+    // What the user chose about the app itself - onboarding done, name, theme, budget, AI consent -
+    // is a handful of switches rather than rows, so it belongs in DataStore next to the ledger.
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     // ViewModel + lifecycle-aware state collection for the screens
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -109,22 +159,32 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.0")
     implementation("androidx.camera:camera-lifecycle:1.4.0")
     implementation("androidx.camera:camera-view:1.4.0")
-    // Accompanist
+    // Accompanist: still the permission-state source for the camera screen. It has no stable
+    // release line (the project is in maintenance), so this stays at the latest published alpha;
+    // the API used here is small and marked @ExperimentalPermissionsApi at the call site.
     implementation("com.google.accompanist:accompanist-permissions:0.35.0-alpha")
     // On-device OCR: the bundled recognizer, so receipt text never leaves the phone and needs no
     // first-run model download (the benchmark showed its line grouping beats EasyOCR on receipts)
     implementation("com.google.mlkit:text-recognition:16.0.1")
-    // `.await()` on the Task the recognizer hands back, so extraction stays a plain suspend call
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
-    // Premium AI Insights: the DeepSeek HTTP call (transport, plus the JSON codec for its body)
+    // `.await()` on the Task the recognizer hands back, so extraction stays a plain suspend call.
+    // Versionless: the coroutines BOM chosen by Room pins it (resolves to 1.9.0).
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services")
+    // Optional AI Insights: the HTTP call through the developer's proxy (transport, plus the JSON
+    // codec for its body). No provider credential is involved; see data/remote/AiBackendConfig.kt.
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
+    // Runs ViewModel `viewModelScope` work on a deterministic main dispatcher: the retention tests
+    // exercise real state machines, not just pure functions.
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    // Kept deliberately: although no test imports Espresso today, removing it changes the androidTest
+    // graph's constraints on androidx.concurrent and breaks resolution. Not worth trading a working
+    // instrumented build for an unused-dependency cleanup.
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

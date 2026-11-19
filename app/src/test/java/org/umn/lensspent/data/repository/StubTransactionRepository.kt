@@ -58,6 +58,16 @@ internal class StubTransactionRepository(
 
     override suspend fun deleteTransaction(id: Long) = unused()
 
+    override suspend fun deleteTransactionAndOrphanCapture(id: Long): String? = unused()
+
+    override suspend fun captureImageUris(): List<String> = unused()
+
+    override suspend fun confirmCaptureAndForgetExtraction(captureId: Long): String? = unused()
+
+    override suspend fun discardCapture(captureId: Long): String? = unused()
+
+    override suspend fun forgetAllCaptures(): List<String> = unused()
+
     override suspend fun recordCapture(
         sourceUri: String,
         source: CaptureSource,

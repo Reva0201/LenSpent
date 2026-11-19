@@ -84,6 +84,21 @@ class OfflineTransactionRepository(
 
     override suspend fun deleteTransaction(id: Long) = transactionDao.deleteById(id)
 
+    /**
+     * Deletes the row and its capture together.
+     *
+     * The capture is only deleted when no other transaction still points at it, which keeps a
+     * duplicated scan from removing an image another row still describes. The image URI comes back to
+     * the caller because deleting bytes needs an Android `Context`, which this layer does not hold.
+     */
+    override suspend fun deleteTransactionAndOrphanCapture(id: Long): String? {
+        val transaction = transactionDao.findById(id) ?: return null
+        transactionDao.deleteById(id)
+        return releaseCaptureIfUnreferenced(transaction.captureId)
+    }
+
+    override suspend fun captureImageUris(): List<String> = captureDao.allSourceUris()
+
     override suspend fun recordCapture(
         sourceUri: String,
         source: CaptureSource,
@@ -116,12 +131,48 @@ class OfflineTransactionRepository(
         modelVersion = modelVersion
     )
 
+    override suspend fun confirmCaptureAndForgetExtraction(captureId: Long): String? {
+        val capture = captureDao.findById(captureId) ?: return null
+        captureDao.updateStatus(captureId, CaptureStatus.CONFIRMED)
+        captureDao.clearExtraction(captureId)
+        // The image is still on disk at this point; the caller deletes it once the confirmation has
+        // been shown. Returning the URI is what makes that possible without leaking a file.
+        return capture.sourceUri
+    }
+
+    override suspend fun discardCapture(captureId: Long): String? {
+        val capture = captureDao.findById(captureId) ?: return null
+        captureDao.deleteById(captureId)
+        return capture.sourceUri
+    }
+
+    override suspend fun forgetAllCaptures(): List<String> {
+        val uris = captureDao.allSourceUris()
+        transactionDao.clearCaptureLinks()
+        captureDao.deleteAll()
+        return uris
+    }
+
     override suspend fun seedIfEmpty() {
         // The taxonomy only. The ledger starts empty on purpose: a new install shows the user their own
         // spending or an empty state, never rows they did not enter.
         if (categoryDao.count() == 0) {
             categoryDao.insertAll(DefaultCategories)
         }
+    }
+
+    /**
+     * Removes a capture row once nothing points at it, returning the image URI.
+     *
+     * Read-then-delete is safe here because both statements run on Room's single writer and the
+     * ledger is single-user: there is no interleaving writer that could add a reference in between.
+     */
+    private suspend fun releaseCaptureIfUnreferenced(captureId: Long?): String? {
+        if (captureId == null) return null
+        if (transactionDao.countForCapture(captureId) > 0) return null
+        val capture = captureDao.findById(captureId) ?: return null
+        captureDao.deleteById(captureId)
+        return capture.sourceUri
     }
 
     /** Joins transactions with the taxonomy in one pass, so no row is ever emitted half-built. */

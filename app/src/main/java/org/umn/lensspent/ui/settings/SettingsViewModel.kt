@@ -3,20 +3,25 @@ package org.umn.lensspent.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.umn.lensspent.AppLog
 import org.umn.lensspent.SubscriptionStopTimeoutMillis
 import org.umn.lensspent.data.local.NoBudgetIdr
 import org.umn.lensspent.data.local.ThemePreference
 import org.umn.lensspent.data.local.UserPreferencesRepository
 import org.umn.lensspent.data.model.Transaction
+import org.umn.lensspent.data.remote.AiAccess
+import org.umn.lensspent.data.remote.AiBackendConfig
+import org.umn.lensspent.data.repository.CaptureImageDeleter
 import org.umn.lensspent.data.repository.TransactionRepository
 
 /** Every column of the export, in order. This list is the file's shape. */
@@ -27,7 +32,17 @@ data class SettingsUiState(
     val username: String = "",
     val themePreference: ThemePreference = ThemePreference.Default,
     /** The ceiling chosen at onboarding or here, or [NoBudgetIdr] when there is none. */
-    val monthlyBudgetIdr: Long = NoBudgetIdr
+    val monthlyBudgetIdr: Long = NoBudgetIdr,
+    /** Whether this build has a secure AI backend at all. */
+    val aiBackendConfigured: Boolean = false,
+    /** The user's AI networking switch. */
+    val aiNetworkEnabled: Boolean = true,
+    /** Whether the AI disclosure has been accepted. */
+    val aiConsentGranted: Boolean = false,
+    /** Whether the gate is fully open right now. */
+    val aiAvailable: Boolean = false,
+    /** Size of the stored receipt images, for the "remove" affordance. */
+    val storedReceiptBytes: Long = 0L
 )
 
 /**
@@ -40,25 +55,74 @@ data class SettingsUiState(
 class SettingsViewModel(
     private val preferences: UserPreferencesRepository,
     private val ledger: TransactionRepository,
+    private val images: CaptureImageDeleter = CaptureImageDeleter.None,
+    /** Reads the current directory size; injected so tests need no filesystem. */
+    private val receiptBytes: suspend () -> Long = { 0L },
+    /** Deletes every stored receipt image. */
+    private val deleteReceiptImages: suspend () -> Int = { 0 },
     private val zone: ZoneId = ZoneId.systemDefault()
 ) : ViewModel() {
 
     private val _pendingCsvExport = MutableStateFlow<String?>(null)
 
-    /** The ledger as CSV, waiting for a share sheet; null when there is nothing to hand off. */
+    /**
+     * The ledger as CSV, waiting for a share sheet.
+     *
+     * Non-null means the user has confirmed the share; [SettingsScreen] hands it to the chooser and
+     * then calls [onCsvExportHandled], which clears it. The CSV itself is never logged, never
+     * persisted, and never written to a shared folder.
+     */
     val pendingCsvExport: StateFlow<String?> = _pendingCsvExport.asStateFlow()
 
+    private val _isConfirmingExport = MutableStateFlow(false)
+
+    /** True while the "the whole ledger will be shared" dialog is up. */
+    val isConfirmingExport: StateFlow<Boolean> = _isConfirmingExport.asStateFlow()
+
+    private val _isConfirmingReceiptRemoval = MutableStateFlow(false)
+
+    /** True while the "remove stored receipt images" dialog is up. */
+    val isConfirmingReceiptRemoval: StateFlow<Boolean> = _isConfirmingReceiptRemoval.asStateFlow()
+
+    private val _receiptBytes = MutableStateFlow(0L)
+
+    /**
+     * Reads the receipt directory size, if the caller has one.
+     *
+     * Called by the screen when it appears rather than launched from `init`: a ViewModel constructor
+     * that starts work makes every test of it depend on a dispatcher, and the size is cosmetic.
+     */
+    fun refreshReceiptSize() {
+        viewModelScope.launch {
+            _receiptBytes.value = runCatching { receiptBytes() }.getOrDefault(0L)
+        }
+    }
+
     val uiState: StateFlow<SettingsUiState> =
-        preferences.preferences.map { stored ->
+        combine(
+            preferences.preferences,
+            _receiptBytes
+        ) { stored, bytes ->
+            val consent = stored?.aiConsentGranted ?: false
+            val enabled = stored?.aiNetworkEnabled ?: true
             SettingsUiState(
                 username = stored?.username.orEmpty(),
                 themePreference = stored?.themePreference ?: ThemePreference.Default,
-                monthlyBudgetIdr = stored?.monthlyBudgetIdr ?: NoBudgetIdr
+                monthlyBudgetIdr = stored?.monthlyBudgetIdr ?: NoBudgetIdr,
+                aiBackendConfigured = AiBackendConfig.isConfigured,
+                aiNetworkEnabled = enabled,
+                aiConsentGranted = consent,
+                aiAvailable = AiAccess(
+                    configured = AiBackendConfig.isConfigured,
+                    enabled = enabled,
+                    consentGranted = consent
+                ).isAllowed,
+                storedReceiptBytes = bytes
             )
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(SubscriptionStopTimeoutMillis),
-            initialValue = SettingsUiState()
+            initialValue = SettingsUiState(aiBackendConfigured = AiBackendConfig.isConfigured)
         )
 
     fun onThemeSelected(preference: ThemePreference) {
@@ -76,15 +140,33 @@ class SettingsViewModel(
         viewModelScope.launch { preferences.setMonthlyBudgetIdr(amount) }
     }
 
+    /** The AI networking switch. Turning it off stops any further request immediately. */
+    fun onAiNetworkEnabledChanged(enabled: Boolean) {
+        viewModelScope.launch { preferences.setAiNetworkEnabled(enabled) }
+    }
+
+    /** Opening the export flow shows the disclosure first; nothing is read until it is confirmed. */
+    fun onExportRequested() {
+        if (_pendingCsvExport.value != null) return
+        _isConfirmingExport.value = true
+    }
+
+    fun onExportDismissed() {
+        _isConfirmingExport.value = false
+    }
+
     /**
      * Reads the whole ledger once and publishes it as CSV for the screen to share.
      *
      * The read is a one-shot on purpose: the export should be the ledger as it is at the moment the
-     * user asked, not a file that keeps changing under them while the share sheet is open.
+     * user confirmed, not a file that keeps changing under them while the share sheet is open.
      */
-    fun exportTransactions() {
+    fun onExportConfirmed() {
+        _isConfirmingExport.value = false
         if (_pendingCsvExport.value != null) return
         viewModelScope.launch {
+            // The CSV is built in memory and handed straight to the chooser. It is never logged: the
+            // file is the complete ledger, and a log line would be a second, unprotected copy.
             _pendingCsvExport.value = transactionsToCsv(ledger.observeTransactions().first(), zone)
         }
     }
@@ -92,6 +174,36 @@ class SettingsViewModel(
     /** The share sheet is up, or the user dismissed it; either way the hand-off is over. */
     fun onCsvExportHandled() {
         _pendingCsvExport.value = null
+    }
+
+    /** The screen could not open a chooser (no activity, no target): drop the pending export. */
+    fun onCsvExportFailed() {
+        _pendingCsvExport.value = null
+        AppLog.warn("CSV export could not be handed to a share target")
+    }
+
+    fun onReceiptRemovalRequested() {
+        _isConfirmingReceiptRemoval.value = true
+    }
+
+    fun onReceiptRemovalDismissed() {
+        _isConfirmingReceiptRemoval.value = false
+    }
+
+    /**
+     * Removes receipt photos and capture rows, keeping the ledger.
+     *
+     * The user asked to remove pictures, not their spending history, so the transactions stay and
+     * only their link to a now-deleted capture is cleared. Any image URI the repository returns is
+     * deleted through [images]; the directory sweep then removes anything left untracked.
+     */
+    fun onReceiptRemovalConfirmed() {
+        _isConfirmingReceiptRemoval.value = false
+        viewModelScope.launch {
+            ledger.forgetAllCaptures().forEach { uri -> images.delete(uri) }
+            deleteReceiptImages()
+            refreshReceiptSize()
+        }
     }
 }
 

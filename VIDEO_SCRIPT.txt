@@ -1,0 +1,142 @@
+LENSSPENT — NASKAH VIDEO DEMO
+Target 4:30 · maksimal 5:00 · 1080p · satu take, tanpa editing
+
+Persiapan sebelum merekam:
+  1. adb shell am force-stop org.umn.lensspent
+     adb shell pm clear org.umn.lensspent        (instalasi bersih, data contoh muncul)
+  2. Tema terang, ponsel silent, notifikasi bersih
+  3. Satu foto struk sudah ada di galeri
+  4. Aplikasi dibuka, berhenti di layar onboarding
+  5. Rekam 1080p, durasi di bawah 5 menit
+
+
+SCENE 1 - PEMBUKA                              0:00 - 0:15
+Layar    Onboarding halaman pertama. Jangan di-tap dulu.
+Ucapkan  "Halo, selamat pagi. Saya Muhammad Meccapareva, dari kelompok
+          Fantastic Four. Aplikasi yang kami buat bernama LensSpent, yaitu
+          pencatat pengeluaran harian yang seluruh datanya disimpan di
+          ponsel. Di video ini saya akan memperlihatkan lima layar yang
+          diwajibkan, tema yang kami buat sendiri, pengelolaan state,
+          navigasi dengan argumen, dan validasi pada form."
+
+
+SCENE 2 - ONBOARDING                           0:15 - 0:35
+Aksi     Tap "Get started". Di halaman dua, tap field anggaran, ketik
+         3000000. Lalu tap "Start tracking".
+Ucapkan  "Saat pertama dibuka, ada dua langkah. Pertama penjelasan privasi:
+          foto struk diproses di perangkat, tidak diunggah. Kedua nama dan
+          anggaran bulanan, keduanya opsional. Field anggaran memakai
+          keyboard angka, dan data contoh ditulis ke basis data lokal pada
+          peluncuran pertama."
+
+
+SCENE 3 - HOME, LAYAR LIST                      0:35 - 1:15
+Layar    Dashboard, kartu anggaran menunjukkan 64% dan Rp 1.087.800 left.
+Aksi     Diam 3 detik sampai animasi angka selesai. Belum digulir.
+Ucapkan  "Ini layar list. Kartu di atas menampilkan total bulan ini,
+          persentase anggaran yang terpakai, dan sisa anggaran. Angkanya
+          bergerak naik saat layar dibuka."
+Aksi     Tunjuk kartu ringkasan, lalu grafik.
+Ucapkan  "Di bawahnya ringkasan minggu ini dan hari ini, lalu grafik
+          pengeluaran harian. Semua angka ini dibaca dari basis data yang
+          sama, jadi tidak bisa berbeda."
+Aksi     Gulir ke daftar transaksi, diam 2 detik.
+Ucapkan  "Ada delapan belas transaksi contoh, sembilan kategori, empat
+          minggu terakhir. Warnanya mengikuti kategori masing-masing."
+Aksi     Tap satu baris.
+Ucapkan  "Saya buka salah satu baris."
+
+
+SCENE 4 - DETAIL, LAYAR DETAIL                  1:15 - 1:45
+Layar    Kartu detail: jumlah, kategori, daftar keterangan, ikon pensil
+         dan tempat sampah di kanan atas.
+Ucapkan  "Layar detail ini dibuka dengan id transaksi sebagai argumen
+          navigasi. Isinya dibaca dari basis data berdasarkan id itu, bukan
+          ditulis tetap di dalam kode. Kalau id-nya tidak ada, muncul
+          keadaan 'transaksi sudah tidak ada', bukan crash. Di kanan atas
+          ada tombol edit dan hapus."
+Aksi     Tap ikon pensil.
+
+
+SCENE 5 - FORM, LAYAR FORM                      1:45 - 3:10
+Layar    "Edit expense", isian sudah terisi.
+Aksi     Tap field jumlah, hapus isinya, ketik 45rb.
+Ucapkan  "Form yang sama dipakai untuk menambah dan mengubah transaksi.
+          Saya coba isi jumlah dengan huruf dulu."
+Aksi     Diam 2 detik pada field merah dan pesan kesalahan.
+Ucapkan  "Field-nya langsung merah, ada pesan use digits only, dan tombol
+          simpan tetap mati."
+Aksi     Hapus, ketik 140000. Diam pada "Saves as Rp 140.000".
+Ucapkan  "Nilai yang akan tersimpan ditampilkan kembali sambil saya
+          mengetik."
+Aksi     Kosongkan field merchant.
+Ucapkan  "Field yang wajib tidak boleh kosong."
+Aksi     Ketik "Bakso Pak Kumis", pilih kategori Groceries. Diam pada
+         tombol yang sudah aktif.
+Ucapkan  "Setelah semua aturan terpenuhi, tombol simpan baru bisa ditekan."
+Aksi     Tap "Save changes", kembali ke layar detail.
+Ucapkan  "Perubahannya benar-benar tersimpan di basis data, bukan hanya
+          berubah di layar."
+Aksi     Kembali ke Home, diam 2 detik.
+Ucapkan  "Total di dashboard ikut berubah."
+
+
+SCENE 6 - KAMERA, LAYAR FITUR NATIVE            3:10 - 3:35
+Aksi     Tap "Scan receipt".
+Ucapkan  "Ini layar fitur native. Ketentuan ujian memperbolehkan versi
+          mockup, tetapi versi kami memakai kamera sungguhan: shutter,
+          impor dari galeri, ganti lensa, dan panel tips. Kalau izin
+          kamera ditolak, yang muncul layar yang memang dirancang, bukan
+          crash."
+Aksi     Tap ikon galeri, pilih foto struk, tunggu layar konfirmasi.
+Ucapkan  "Hasil pembacaan OCR masih bisa dikoreksi sebelum disimpan."
+
+
+SCENE 7 - TRENDS, PILIHAN BEBAS                 3:35 - 4:05
+Aksi     Kembali ke Home, tap tanda panah pada grafik.
+Ucapkan  "Layar pilihan bebas kami beri nama Trends. Ada empat bagian:
+          harian, mingguan, tahunan, dan kategori."
+Aksi     Tap Weekly, lalu Yearly, lalu Categories, agak lambat supaya pil
+         birunya terlihat bergeser.
+Ucapkan  "Pil biru bergeser mengikuti pilihan, dan menggeser halaman juga
+          menggerakkannya."
+Aksi     Diam pada peringkat kategori.
+Ucapkan  "Bagian kategori menunjukkan ke mana uang pergi bulan ini.
+          Angkanya sama dengan dashboard karena sumbernya sama."
+
+
+SCENE 8 - TEMA                                  4:05 - 4:25
+Aksi     Buka Pengaturan, tap Dark. Diam pada Home versi gelap.
+Ucapkan  "Tema Material 3 ini kami buat sendiri: skema warna terang dan
+          gelap, tipografi Plus Jakarta Sans, dan skala bentuk sendiri.
+          Bukan template bawaan Android Studio."
+
+
+SCENE 9 - PENUTUP                               4:25 - 4:40
+Layar    Home versi gelap.
+Ucapkan  "Yang belum ada adalah akun. Itu keputusan, bukan kekurangan,
+          karena aplikasi ini tidak punya server, jadi tidak ada yang bisa
+          diotentikasi. Kalau nanti ada backend, rencananya menambahkan
+          sinkronisasi opsional dengan login sungguhan. Terima kasih."
+Aksi     Hentikan rekaman.
+
+
+CATATAN PENTING
+  Lakukan                          Hindari
+  Sebut nama lima jenis layar:     Membuka AI chat. Build ini tanpa kunci
+  list, detail, form, fitur        API, jadi layarnya menampilkan pesan
+  native, pilihan bebas.           kunci belum diatur.
+
+  Sebut "argumen navigasi" pada    Membaca nama file atau kode.
+  adegan detail.
+
+  Tunjukkan 45rb dan merchant      Melewati keadaan tidak valid. Validasi
+  kosong sebelum keadaan valid.    dinilai dari penolakan input.
+
+  Sebut "dari basis data yang      Mengarahkan kamera ke struk sungguhan
+  sama" di Home dan Trends.        di luar ruangan; jika gagal, waktu habis.
+
+  Diam 2 sampai 3 detik pada       Terburu-buru di adegan form, karena
+  setiap keadaan yang sudah jadi.  bagian itu bobotnya paling besar.
+
+Jika waktu hanya 2:30: scene 1, 3, 4, 5, 7, 8. Lewati onboarding dan kamera.

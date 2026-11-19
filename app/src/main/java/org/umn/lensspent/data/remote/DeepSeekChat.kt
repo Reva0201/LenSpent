@@ -6,12 +6,13 @@ import retrofit2.http.Body
 import retrofit2.http.POST
 
 /**
- * The chat wire format DeepSeek speaks.
+ * The chat wire format the AI backend speaks.
  *
- * DeepSeek's API is OpenAI-compatible, so this is the `POST /chat/completions` schema and nothing
- * more: a model name, a list of role-tagged messages, and the switches that decide how the answer
- * comes back. Keeping it typed means the request builders in [AiInsightsRepository] cannot drift from
- * what the API accepts, and it is the same class the unit tests assert on.
+ * The proxy forwards to a provider with an OpenAI-compatible API, so this is the
+ * `POST /chat/completions` schema and nothing more: a model name, a list of role-tagged messages, and
+ * the switches that decide how the answer comes back. Keeping it typed means the request builders in
+ * [AiInsightsRepository] cannot drift from what the API accepts, and it is the same class the unit
+ * tests assert on.
  */
 @Serializable
 data class ChatCompletionRequest(
@@ -76,16 +77,17 @@ data class ChatUsage(
 )
 
 /**
- * The one DeepSeek endpoint this app calls.
+ * The one AI endpoint this app calls.
  *
  * Declared as an interface so [AiInsightsRepository] depends on it rather than on Retrofit: the JVM
  * tests hand in a recording stand-in and assert on the request that would have gone over the wire,
- * with no HTTP server involved. The base URL and the `Authorization` header belong to
- * [DeepSeekApiClient], so a call site cannot forget either.
+ * with no HTTP server involved. The base URL belongs to [AiBackendConfig] and the transport to
+ * [DeepSeekApiClient]; neither is a provider credential, so a call site cannot leak one because
+ * there is none in the app to leak.
  */
 interface DeepSeekApi {
 
-    /** `POST https://api.deepseek.com/chat/completions` */
+    /** `POST {proxy base URL}/chat/completions` */
     @POST(DeepSeekApiClient.ChatCompletionsPath)
     suspend fun chatCompletions(@Body request: ChatCompletionRequest): ChatCompletionResponse
 }

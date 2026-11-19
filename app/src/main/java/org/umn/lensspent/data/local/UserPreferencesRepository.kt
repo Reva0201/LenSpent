@@ -68,7 +68,23 @@ data class UserPreferences(
      * It lives here rather than in the ledger because it is a choice about the app's behaviour, not a
      * spending row: the dashboard needs it on every frame, and it is not something the user spends.
      */
-    val monthlyBudgetIdr: Long = NoBudgetIdr
+    val monthlyBudgetIdr: Long = NoBudgetIdr,
+    /**
+     * Whether the user has read and accepted the AI disclosure.
+     *
+     * False on a fresh install, including an upgrade from a version that had no AI consent at all.
+     * Nothing is transmitted until this is true, so the default protects a user who never saw the
+     * dialog.
+     */
+    val aiConsentGranted: Boolean = false,
+    /**
+     * The user's AI networking switch, independent of the one-time disclosure.
+     *
+     * On by default so the disclosure can be the only gate a willing user meets; the effective
+     * answer is still `build backend available && this switch && consent` (see `AiAccess`). Turning it
+     * off in Settings stops all AI traffic immediately, and leaves the rest of the app untouched.
+     */
+    val aiNetworkEnabled: Boolean = true
 )
 
 /**
@@ -111,6 +127,17 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
     val monthlyBudgetIdr: Flow<Long> = stored.map { it[Keys.MonthlyBudgetIdr] ?: NoBudgetIdr }
 
     /**
+     * Whether the AI disclosure was accepted.
+     *
+     * Read by the AI repository on every request rather than cached, so revoking consent takes
+     * effect for the next question instead of at the next launch.
+     */
+    val aiConsentGranted: Flow<Boolean> = stored.map { it[Keys.AiConsentGranted] ?: false }
+
+    /** The user's AI networking switch; see [UserPreferences.aiNetworkEnabled] for the default. */
+    val aiNetworkEnabled: Flow<Boolean> = stored.map { it[Keys.AiNetworkEnabled] ?: true }
+
+    /**
      * All of it at once, or null until the first read lands.
      *
      * The null is the whole reason this sits next to the per-key flows above: those can only answer
@@ -136,6 +163,16 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { it[Keys.MonthlyBudgetIdr] = amount }
     }
 
+    /** Records the user's acceptance of the AI disclosure. Never implied; only an explicit tap sets it. */
+    suspend fun setAiConsentGranted(granted: Boolean) {
+        dataStore.edit { it[Keys.AiConsentGranted] = granted }
+    }
+
+    /** The user's AI networking switch. Turning it off leaves the acceptance record intact. */
+    suspend fun setAiNetworkEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.AiNetworkEnabled] = enabled }
+    }
+
     /**
      * The three writes onboarding finishes with, in one transaction.
      *
@@ -157,11 +194,15 @@ private object Keys {
     val Username = stringPreferencesKey("username")
     val ThemePreference = stringPreferencesKey("theme_preference")
     val MonthlyBudgetIdr = longPreferencesKey("monthly_budget_idr")
+    val AiConsentGranted = booleanPreferencesKey("ai_consent_granted")
+    val AiNetworkEnabled = booleanPreferencesKey("ai_network_enabled")
 }
 
 private fun Preferences.toUserPreferences(): UserPreferences = UserPreferences(
     hasCompletedOnboarding = this[Keys.HasCompletedOnboarding] ?: false,
     username = this[Keys.Username] ?: "",
     themePreference = ThemePreference.fromStorage(this[Keys.ThemePreference]),
-    monthlyBudgetIdr = this[Keys.MonthlyBudgetIdr] ?: NoBudgetIdr
+    monthlyBudgetIdr = this[Keys.MonthlyBudgetIdr] ?: NoBudgetIdr,
+    aiConsentGranted = this[Keys.AiConsentGranted] ?: false,
+    aiNetworkEnabled = this[Keys.AiNetworkEnabled] ?: true
 )

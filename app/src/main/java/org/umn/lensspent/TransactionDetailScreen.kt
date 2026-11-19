@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -38,15 +38,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.umn.lensspent.data.model.Transaction
-import org.umn.lensspent.ui.theme.LocalHeroColors
+import org.umn.lensspent.ui.components.CategoryBadge
 import org.umn.lensspent.ui.theme.Sizes
 import org.umn.lensspent.ui.theme.Spacing
 
@@ -166,7 +163,7 @@ private fun FoundPane(
             .padding(horizontal = Spacing.xl, vertical = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.xxl)
     ) {
-        HeroCard(transaction)
+        AmountHeading(transaction)
 
         DetailCard(transaction)
 
@@ -174,7 +171,7 @@ private fun FoundPane(
             onClick = onDelete,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp),
+                .heightIn(min = 52.dp),
             shape = MaterialTheme.shapes.medium
         ) {
             Icon(
@@ -204,82 +201,57 @@ private fun FoundPane(
 }
 
 /**
- * The amount as the one big thing on the page.
+ * The amount, at the head of the page rather than centred on a coloured panel.
  *
- * A detail screen for money answers one question first - how much was it - so the figure is at display
- * size on the brand gradient, and everything else is subordinate. The gradient is the same pair the
- * dashboard's hero uses, which is what makes this read as "the same expense, opened" rather than as an
- * unrelated page.
+ * A detail screen for money answers one question first - how much was it - so the figure leads at
+ * display size. Everything around it is aligned to the same left edge as the facts below, which is
+ * what makes the screen read as one document: merchant, amount, date, category and note are the same
+ * record, not five centred badges.
+ *
+ * Long merchants wrap to two lines; the amount is allowed to wrap too rather than being ellipsized,
+ * because a truncated price is worse than a second line.
  */
 @Composable
-private fun HeroCard(transaction: Transaction) {
-    val hero = LocalHeroColors.current
-    Box(
+private fun AmountHeading(transaction: Transaction) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.extraLarge)
-            .background(Brush.linearGradient(listOf(hero.start, hero.end)))
-            .padding(horizontal = Spacing.xxl, vertical = Spacing.xxl)
+            .padding(top = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(hero.content.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = categoryIcon(transaction.category.iconKey),
-                    contentDescription = null,
-                    tint = hero.content,
-                    modifier = Modifier.size(Sizes.iconLarge)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.sm))
-
-            Text(
-                text = transaction.merchant,
-                style = MaterialTheme.typography.headlineSmall,
-                color = hero.content,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = formatIDR(transaction.amount),
-                style = MaterialTheme.typography.displaySmall,
-                color = hero.content,
-                textAlign = TextAlign.Center
-            )
-
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                color = hero.content.copy(alpha = 0.18f)
-            ) {
+            CategoryBadge(category = transaction.category, size = 40.dp)
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = transaction.category.name.uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = hero.content,
-                    modifier = Modifier.padding(
-                        horizontal = Spacing.md,
-                        vertical = Spacing.xs
-                    )
+                    text = transaction.category.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = transaction.merchant,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
-
-            Spacer(modifier = Modifier.height(Spacing.xs))
-
-            Text(
-                text = formatTransactionDate(transaction.occurredAt),
-                style = MaterialTheme.typography.bodyMedium,
-                color = hero.contentMuted
-            )
         }
+
+        Text(
+            text = formatIDR(transaction.amount),
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Text(
+            text = "${formatTransactionDate(transaction.occurredAt)} · ${formatTransactionTime(transaction.occurredAt)}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(Spacing.xs))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -294,7 +266,10 @@ private fun DetailCard(transaction: Transaction) {
         Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
             DetailRow(label = "Category", value = transaction.category.name)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            DetailRow(label = "Date", value = formatTransactionDate(transaction.occurredAt))
+            DetailRow(
+                label = "Date and time",
+                value = "${formatTransactionDate(transaction.occurredAt)} · ${formatTransactionTime(transaction.occurredAt)}"
+            )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             DetailRow(
                 label = "Note",
@@ -327,14 +302,17 @@ private fun DetailRow(label: String, value: String) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // A proportion rather than a fixed dp width: the label column stays aligned down the
+            // group, and at a large font scale it takes the room it needs instead of clipping.
+            modifier = Modifier.weight(0.36f)
         )
         Text(
             text = value,
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(0.64f)
         )
     }
 }
@@ -405,7 +383,7 @@ private fun DeleteConfirmationDialog(
         title = { Text("Delete this expense?") },
         text = {
             Text(
-                text = "${transaction.merchant} Â· ${formatIDR(transaction.amount)} will be " +
+                text = "${transaction.merchant} · ${formatIDR(transaction.amount)} will be " +
                     "removed from your ledger. This cannot be undone."
             )
         },

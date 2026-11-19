@@ -1,137 +1,158 @@
 package org.umn.lensspent
 
-import android.content.ContentUris
-import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
 import java.io.File
+import java.io.IOException
+import java.util.UUID
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Shared native media content resolver manager utilizing the device's MediaStore.
+ * Where a receipt photo lives while it is being read, and how long it lives there.
+ *
+ * Receipts are personal-data rich: a photo shows a merchant, a time, often a card fragment and the
+ * full basket. They therefore stay in **app-private internal storage** (`filesDir/receipts`), never
+ * in the shared gallery, so no other app - and no media scanner or cloud photo backup - can read
+ * them. Nothing here needs a storage permission, and no content provider is exported to hand them
+ * out.
+ *
+ * Retention, deliberately short:
+ *  - the image is kept only while the capture is being reviewed;
+ *  - it is deleted when the user confirms the expense (the ledger row is the record that matters),
+ *    when they discard the capture, and when a transaction created from it is deleted;
+ *  - [deleteOrphans] sweeps files with no capture row, which covers a crash or cancellation between
+ *    writing the file and recording the capture.
  */
 object ImageStorage {
 
-    /**
-     * Returns the most recent image in the shared gallery natively via the MediaStore content provider,
-     * or null when there is none.
-     *
-     * Only a single row is read, and the query always hops to [Dispatchers.IO] so callers can never walk
-     * the image table on the main thread.
-     */
-    suspend fun latestNativePhoto(context: Context): Uri? = withContext(Dispatchers.IO) {
-        val projection = arrayOf(MediaStore.Images.Media._ID)
-        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+    /** Subdirectory under `filesDir`; the backup rules exclude it explicitly. */
+    private const val ReceiptDirectory = "receipts"
 
+    /** The directory itself, created on demand. Never shared. */
+    fun receiptDirectory(context: Context): File =
+        File(context.filesDir, ReceiptDirectory).apply { if (!exists()) mkdirs() }
+
+    /**
+     * Writes [source]'s bytes into private storage and returns the URI of the copy.
+     *
+     * Returns null when the read or write fails, having removed any partial file first: a capture row
+     * pointing at a half-written image is worse than no capture, because the review screen would show
+     * a broken frame with no way to tell why. Callers treat null as "nothing to record".
+     */
+    suspend fun importToPrivateStorage(
+        context: Context,
+        source: Uri,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ): Uri? = withContext(dispatcher) {
+        val target = newReceiptFile(context)
         try {
-            context.contentResolver.query(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                projection,
-                null,
-                null,
-                sortOrder
-            )?.use { cursor ->
-                val idColumn = cursor.getColumnIndex(MediaStore.Images.Media._ID)
-                if (idColumn != -1 && cursor.moveToFirst()) {
-                    ContentUris.withAppendedId(
-                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                        cursor.getLong(idColumn)
-                    )
-                } else {
-                    null
-                }
+            val copied = context.contentResolver.openInputStream(source)?.use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+                true
+            } ?: false
+
+            if (copied && target.length() > 0L) {
+                Uri.fromFile(target)
+            } else {
+                target.delete()
+                null
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (e: IOException) {
+            target.delete()
+            AppLog.warn("Could not copy a picked image into private storage")
+            null
+        } catch (e: SecurityException) {
+            // The picker grant can be withdrawn before the copy runs; that is not a crash.
+            target.delete()
+            AppLog.warn("The picked image was no longer readable")
             null
         }
     }
 
+    /** A fresh, unique receipt file. Unique names keep two fast captures from overwriting each other. */
+    fun newReceiptFile(context: Context): File =
+        File(receiptDirectory(context), "receipt-${UUID.randomUUID()}.jpg")
+
     /**
-     * Collection a capture is inserted into: the primary shared volume on API 29+, the legacy URI below.
+     * Deletes the file behind [uri], if it is one of ours.
+     *
+     * Refuses anything outside [receiptDirectory]: a capture row could hold an old `content://` URI
+     * from a previous version, and deleting an arbitrary provider row because a string was stored
+     * would be a destructive surprise. Unknown URIs are simply left alone.
      */
-    fun captureCollection(): Uri {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        } else {
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        }
+    suspend fun deleteReceipt(
+        context: Context,
+        uri: String?,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ): Boolean = withContext(dispatcher) {
+        val file = privateFileFor(context, uri) ?: return@withContext false
+        val deleted = file.delete()
+        if (!deleted) AppLog.warn("A receipt image could not be deleted")
+        deleted
     }
 
     /**
-     * Prepares standard ContentValues mapping for inserting a new camera capture natively into the shared gallery.
+     * Deletes every receipt file that [isReferenced] says no capture row points at.
      *
-     * On API 29+ the row is inserted as pending, so no gallery or indexer can observe a half-written
-     * frame; [publishImage] clears the flag once the capture is complete.
+     * The sweep is what closes the crash/cancel window: the file is written first, then the capture
+     * row, so a failure between those two steps leaves an untracked image. It is only ever started
+     * from an explicit cleanup (app start or the Settings action), never while a review is open.
      */
-    fun createNativeImageContentValues(): ContentValues {
-        return ContentValues().apply {
-            val timestamp = System.currentTimeMillis()
-            put(MediaStore.MediaColumns.DISPLAY_NAME, "IMG_$timestamp.jpg")
-            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + File.separator + "LensSpent")
-                put(MediaStore.MediaColumns.IS_PENDING, 1)
-            }
-        }
+    suspend fun deleteOrphans(
+        context: Context,
+        isReferenced: (String) -> Boolean,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ): Int = withContext(dispatcher) {
+        val directory = receiptDirectory(context)
+        directory.listFiles()
+            ?.filter { file -> file.isFile && !isReferenced(Uri.fromFile(file).toString()) }
+            ?.count { file -> file.delete() }
+            ?: 0
+    }
+
+    /** Deletes every receipt image. Used by the "remove stored receipt images" setting. */
+    suspend fun deleteAll(
+        context: Context,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ): Int = withContext(dispatcher) {
+        val directory = receiptDirectory(context)
+        directory.listFiles()?.count { it.isFile && it.delete() } ?: 0
     }
 
     /**
-     * Copies an image the user picked into the app's own folder in the shared gallery, and returns the
-     * URI of the copy.
+     * Total bytes held by receipt images, for the Settings row that offers to remove them.
      *
-     * The grant the photo picker hands back lasts only as long as this process does, and a capture row
-     * outlives it: without the copy, reopening an old pick after a restart would point at an image this
-     * app is no longer allowed to read, and the OCR stage would have nothing to open.
-     *
-     * Returns null when nothing could be copied, in which case there is no image worth recording.
+     * Counts files only; never opens one. A number is enough to let the user decide.
      */
-    suspend fun importToGallery(context: Context, source: Uri): Uri? {
-        val copy = withContext(Dispatchers.IO) {
-            try {
-                val target = context.contentResolver.insert(
-                    captureCollection(),
-                    createNativeImageContentValues()
-                ) ?: return@withContext null
-
-                val copied = context.contentResolver.openInputStream(source)?.use { input ->
-                    context.contentResolver.openOutputStream(target)?.use { output ->
-                        input.copyTo(output)
-                        true
-                    } ?: false
-                } ?: false
-
-                if (copied) {
-                    target
-                } else {
-                    // A row with no bytes behind it is worse than no row: it would show a blank frame in
-                    // the gallery forever, so the insert is rolled back.
-                    context.contentResolver.delete(target, null, null)
-                    null
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
-        }
-        if (copy != null) publishImage(context, copy)
-        return copy
+    suspend fun storedBytes(
+        context: Context,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ): Long = withContext(dispatcher) {
+        receiptDirectory(context).listFiles()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L
     }
 
     /**
-     * Clears the pending flag of a finished capture so the rest of the device can see it.
+     * The file behind [uri], but only when it resolves inside [receiptDirectory].
+     *
+     * Both the `file:` spelling and an older `content://` spelling of one of our receipts map back to
+     * a path inside the directory; anything else - a gallery URI, a provider row, a traversal attempt
+     * - resolves outside it and is refused. Deletion is therefore limited to files this app created.
      */
-    suspend fun publishImage(context: Context, uri: Uri) = withContext(Dispatchers.IO) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return@withContext
-        val values = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
-        try {
-            context.contentResolver.update(uri, values, null, null)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+    internal fun privateFileFor(context: Context, uri: String?): File? {
+        if (uri.isNullOrBlank()) return null
+        val parsed = runCatching { Uri.parse(uri) }.getOrNull() ?: return null
+        val directory = receiptDirectory(context).canonicalFile
+
+        val candidate = when (parsed.scheme) {
+            "file" -> parsed.path?.let(::File)
+            // Legacy rows from the shared-gallery build pointed at MediaStore. They are deliberately
+            // not deleted here: those rows belong to the user's gallery, not to this app.
+            else -> null
+        } ?: return null
+
+        val canonical = runCatching { candidate.canonicalFile }.getOrNull() ?: return null
+        return canonical.takeIf { it.parentFile == directory }
     }
 }

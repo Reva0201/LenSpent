@@ -26,24 +26,18 @@ internal data class ProcessedRow(
 }
 
 /**
- * Puts the recognizer's lines back into the rows the receipt actually prints.
+ * Puts the recognizer's lines back into the rows the receipt was printed in.
  *
- * ML Kit hands its lines back grouped into blocks, and a block is not a printed row. On a real
- * photo - small thermal print, held at a slight angle - it splits one printed row into several
- * blocks (the item name on the left, its price on the right) and returns those blocks in an order
- * that has nothing to do with where they were printed. Flattened, "Total" ends up several lines away
- * from the figure printed beside it, and the label-first reading in [ReceiptParser] has nothing left
- * to read: the whole receipt falls through to the fallback even though every character was
- * recognised correctly.
+ * ML Kit groups its lines into blocks, and a block is not a printed row. On a real photo it splits one
+ * row into several blocks (item name on the left, price on the right) and returns them in an order that
+ * has nothing to do with where they were printed, so "Total" ends up far from its figure and
+ * [ReceiptParser] has nothing to read.
  *
- * So geometry is used instead of the order the lines came in. Lines are placed by the band of the
- * image they occupy, and a line joins the row above it when the two overlap vertically by at least a
- * third of the shorter one. A row is anchored on its topmost line rather than on the strip covered
- * by everything added so far, which is what stops the tilted right edge of each row - a few pixels
- * lower than its left - from walking one row into the next.
+ * Lines are placed by the band of the image they occupy instead. A line joins the row above it when the
+ * two overlap vertically by at least a third of the shorter one. Anchoring each row on its topmost line
+ * stops the tilted right edge of a row from walking into the next one.
  *
- * Nothing is invented here: the same text comes back, in the order a person reading the receipt
- * would say it, so "Total" and its figure are one row again.
+ * The text itself is unchanged, only reordered.
  */
 internal fun rowsOf(lines: List<OcrLine>): List<String> {
     return processedRowsOf(lines).map { it.text }

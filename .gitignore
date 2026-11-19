@@ -19,3 +19,9 @@ hs_err_pid*.log
 replay_pid*.log
 # CLI build output captured to a file at the repo root during scripted runs.
 *-build.log
+# Local signing material and provider keys must never be committed. The app ships no key at all
+# (see docs/SECURITY.md), but these patterns keep an accidental developer local file out of git.
+*.jks
+*.keystore
+*.p12
+secrets.properties

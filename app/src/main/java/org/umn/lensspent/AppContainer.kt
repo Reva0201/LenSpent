@@ -2,12 +2,18 @@ package org.umn.lensspent
 
 import android.content.Context
 import androidx.room.Room
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import org.umn.lensspent.data.extraction.CaptureExtractor
 import org.umn.lensspent.data.extraction.MlKitCaptureExtractor
 import org.umn.lensspent.data.local.LensSpentDatabase
 import org.umn.lensspent.data.local.UserPreferencesRepository
+import org.umn.lensspent.data.remote.AiAccess
+import org.umn.lensspent.data.remote.AiBackendConfig
 import org.umn.lensspent.data.remote.AiInsightsRepository
 import org.umn.lensspent.data.remote.DeepSeekApiClient
+import org.umn.lensspent.data.repository.CaptureImageDeleter
 import org.umn.lensspent.data.repository.OfflineTransactionRepository
 import org.umn.lensspent.data.repository.TransactionRepository
 
@@ -52,6 +58,17 @@ class AppContainer(context: Context) {
     }
 
     /**
+     * Deletes a capture's image bytes once the row that owned it is gone.
+     *
+     * Kept out of the repository (which has no `Context`) and out of the ViewModels (which have no
+     * business knowing where files live), so "confirmed/discarded/deleted receipts leave no orphan
+     * photo" is one decision in one place.
+     */
+    val captureImageDeleter: CaptureImageDeleter = CaptureImageDeleter { uri ->
+        ImageStorage.deleteReceipt(applicationContext, uri)
+    }
+
+    /**
      * The on-device extraction pipeline: ML Kit OCR and the fast-path parser. Exposing it as a [CaptureExtractor] is what keeps
      * every screen and ViewModel unaware of how many stages run behind it.
      */
@@ -63,20 +80,51 @@ class AppContainer(context: Context) {
     }
 
     /**
-     * Premium AI Insights: the one collaborator here that leaves the phone.
+     * The secure backend the AI feature talks to, if this build was given one.
+     *
+     * Null is the normal case for a source checkout and for the shipped default: the app has no
+     * provider credential to embed, so with no proxy configured there is nothing to call.
+     */
+    private val aiApi by lazy { DeepSeekApiClient.createOrNull() }
+
+    /**
+     * The three gates that decide whether one AI request may leave the phone.
+     *
+     * Read live from DataStore on every request, so switching AI off in Settings (or a future consent
+     * revocation) applies to the very next question rather than the next launch.
+     */
+    val aiAccess: Flow<AiAccess> =
+        combine(
+            userPreferencesRepository.aiConsentGranted,
+            userPreferencesRepository.aiNetworkEnabled
+        ) { consent, enabled ->
+            AiAccess(
+                configured = AiBackendConfig.isConfigured && aiApi != null,
+                enabled = enabled,
+                consentGranted = consent
+            )
+        }
+
+    /**
+     * The AI feature's data layer.
      *
      * It is built on the same [transactionRepository] the dashboard reads, so the assistant can never
-     * describe a different ledger from the one on screen. Its key is the one this build was compiled
-     * with - see [DeepSeekApiClient.ApiKey] - and a build without one is not an error either: the
-     * repository turns the missing key into a sentence the chat can show. The clock is left at its
-     * default, so the date the assistant is told is the phone's own - which is the one the ledger was
-     * written in.
+     * describe a different ledger from the one on screen. What it may transmit is decided one layer
+     * down in `toInsightMonths` - monthly, category-level aggregates only.
      */
     val aiInsightsRepository: AiInsightsRepository by lazy {
         AiInsightsRepository(
             transactions = transactionRepository,
-            api = DeepSeekApiClient.create(),
-            apiKeyConfigured = DeepSeekApiClient.isConfigured
+            api = aiApi,
+            access = {
+                // One-shot reads: the repository asks at the moment of the request, which is the only
+                // moment the answer is guaranteed to reflect what the user just chose.
+                AiAccess(
+                    configured = AiBackendConfig.isConfigured && aiApi != null,
+                    enabled = userPreferencesRepository.aiNetworkEnabled.first(),
+                    consentGranted = userPreferencesRepository.aiConsentGranted.first()
+                )
+            }
         )
     }
 }

@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.umn.lensspent.data.model.Transaction
+import org.umn.lensspent.data.repository.CaptureImageDeleter
 import org.umn.lensspent.data.repository.TransactionRepository
 
 /**
@@ -37,7 +38,8 @@ sealed interface TransactionDetailUiState {
  */
 class TransactionDetailViewModel(
     private val repository: TransactionRepository,
-    transactionId: Long
+    transactionId: Long,
+    private val images: CaptureImageDeleter = CaptureImageDeleter.None
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<TransactionDetailUiState>(TransactionDetailUiState.Loading)
@@ -74,7 +76,11 @@ class TransactionDetailViewModel(
         val transaction = (_uiState.value as? TransactionDetailUiState.Found)?.transaction ?: return
         _confirmingDelete.value = false
         viewModelScope.launch {
-            repository.deleteTransaction(transaction.id)
+            // The row and its capture go together. The repository returns the image URI only when the
+            // capture is no longer referenced, so deleting a duplicated scan cannot remove an image
+            // another row still describes.
+            val imageUri = repository.deleteTransactionAndOrphanCapture(transaction.id)
+            images.delete(imageUri)
             _finished.value = true
         }
     }
